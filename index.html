@@ -3,7 +3,7 @@
 
 <head>
 <meta charset="UTF-8">
-<title>Supplier NCR Dashboard</title>
+<title>Supplier NCR Performance Dashboard</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -12,88 +12,134 @@
 
 <body>
 
-<div class="header">
+<div class="container">
 
-<div class="left-panel">
+    <div class="sidebar">
 
-<h2>NCR Analysis</h2>
+        <div class="logo">
+            NCR
+        </div>
 
-<select id="supplierFilter">
-<option value="">All Suppliers</option>
-</select>
+        <div class="logo-sub">
+            Supplier Performance Dashboard
+        </div>
 
-<select id="yearFilter">
-<option value="">All Years</option>
-</select>
+        <div class="filter-group">
+            <label>Supplier</label>
+            <select id="supplierFilter">
+                <option value="">All Suppliers</option>
+            </select>
+        </div>
 
-</div>
+        <div class="filter-group">
+            <label>Year</label>
+            <select id="yearFilter">
+                <option value="">All Years</option>
+            </select>
+        </div>
 
-<div class="title">
-SUPPLIER PERFORMANCE
-</div>
+        <button
+            class="reset-btn"
+            onclick="location.reload()">
+            Reset
+        </button>
 
-</div>
+    </div>
 
-<div class="kpi-grid">
+    <div class="main">
 
-<div class="kpi-card">
-<h4>Total NCR</h4>
-<span id="totalNcr">0</span>
-</div>
+        <div class="header">
 
-<div class="kpi-card">
-<h4>Total Qty</h4>
-<span id="totalQty">0</span>
-</div>
+            <div>
 
-<div class="kpi-card">
-<h4>Suppliers</h4>
-<span id="totalSupplier">0</span>
-</div>
+                <div class="page-title">
+                    SUPPLIER PERFORMANCE
+                </div>
 
-<div class="kpi-card">
-<h4>Parts</h4>
-<span id="totalPart">0</span>
-</div>
+                <div class="page-sub">
+                    NCR Analytics Dashboard
+                </div>
 
-<div class="kpi-card">
-<h4>Open NCR</h4>
-<span id="openNcr">0</span>
-</div>
+            </div>
 
-</div>
+            <div class="info-box">
 
-<div class="charts-grid">
+                <div class="info-card">
+                    Live NCR Data
+                </div>
 
-<div class="chart-card wide">
-<h3>Supplier NCR Ranking</h3>
-<canvas id="supplierChart"></canvas>
-</div>
+                <div class="info-card">
+                    Google Sheet Connected
+                </div>
 
-<div class="chart-card">
-<h3>NCR by Year</h3>
-<canvas id="yearChart"></canvas>
-</div>
+            </div>
 
-<div class="chart-card">
-<h3>NCR by Month</h3>
-<canvas id="monthChart"></canvas>
-</div>
+        </div>
 
-<div class="chart-card">
-<h3>Top Parts</h3>
-<canvas id="partChart"></canvas>
-</div>
+        <div class="kpi-grid">
 
-<div class="chart-card">
-<h3>Phenomenon</h3>
-<canvas id="phenomenonChart"></canvas>
-</div>
+            <div class="kpi-card">
+                <h4>Total NCR</h4>
+                <span id="totalNcr">0</span>
+            </div>
 
-<div class="chart-card wide">
-<h3>Replacement Status</h3>
-<canvas id="statusChart"></canvas>
-</div>
+            <div class="kpi-card">
+                <h4>Total Qty</h4>
+                <span id="totalQty">0</span>
+            </div>
+
+            <div class="kpi-card">
+                <h4>Suppliers</h4>
+                <span id="totalSupplier">0</span>
+            </div>
+
+            <div class="kpi-card">
+                <h4>Parts</h4>
+                <span id="totalPart">0</span>
+            </div>
+
+            <div class="kpi-card">
+                <h4>Open NCR</h4>
+                <span id="openNcr">0</span>
+            </div>
+
+        </div>
+
+        <div class="charts-grid">
+
+            <div class="chart-card wide">
+                <h3>Supplier NCR Ranking</h3>
+                <canvas id="supplierChart"></canvas>
+            </div>
+
+            <div class="chart-card">
+                <h3>NCR by Year</h3>
+                <canvas id="yearChart"></canvas>
+            </div>
+
+            <div class="chart-card">
+                <h3>NCR by Month</h3>
+                <canvas id="monthChart"></canvas>
+            </div>
+
+            <div class="chart-card">
+                <h3>Top Parts</h3>
+                <canvas id="partChart"></canvas>
+            </div>
+
+            <div class="chart-card">
+                <h3>Phenomenon</h3>
+                <canvas id="phenomenonChart"></canvas>
+            </div>
+
+            <div class="chart-card wide">
+                <h3>Replacement Status</h3>
+                <canvas id="statusChart"></canvas>
+            </div>
+
+        </div>
+
+    </div>
 
 </div>
 
