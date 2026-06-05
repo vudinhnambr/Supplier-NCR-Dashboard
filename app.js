@@ -9,344 +9,372 @@ let phenomenonChart;
 
 async function loadData() {
 
-const response =
-await fetch('/api/ncr');
+    try {
 
-const data =
-await response.json();
+        const response =
+            await fetch('/api/ncr');
 
-rawData = data;
+        const data =
+            await response.json();
 
-populateFilters();
+        rawData = data;
 
-renderDashboard();
+        populateFilters();
 
-}
+        renderDashboard();
 
-function normalizeSupplier(v){
+    } catch (err) {
 
-return (v || "")
-.trim()
-.toUpperCase();
+        console.error(err);
 
-}
+        alert("Cannot load NCR data");
 
-function populateFilters(){
-
-const supplierList =
-[
-...new Set(
-rawData.map(x =>
-normalizeSupplier(x.Supplier)
-)
-)
-].sort();
-
-const supplierFilter =
-document.getElementById(
-"supplierFilter"
-);
-
-supplierList.forEach(s=>{
-
-const option =
-document.createElement("option");
-
-option.value=s;
-option.textContent=s;
-
-supplierFilter.appendChild(option);
-
-});
-
-const years =
-[
-...new Set(
-rawData.map(
-x=>x["NCR NCR Year"]
-)
-)
-].sort();
-
-const yearFilter =
-document.getElementById(
-"yearFilter"
-);
-
-years.forEach(y=>{
-
-const option =
-document.createElement("option");
-
-option.value=y;
-option.textContent=y;
-
-yearFilter.appendChild(option);
-
-});
-
-supplierFilter.onchange=
-renderDashboard;
-
-yearFilter.onchange=
-renderDashboard;
+    }
 
 }
 
-function renderDashboard(){
+function normalizeSupplier(v) {
 
-const supplier =
-document.getElementById(
-"supplierFilter"
-).value;
-
-const year =
-document.getElementById(
-"yearFilter"
-).value;
-
-let data =
-rawData;
-
-if(supplier !== "ALL"){
-
-data =
-data.filter(
-x =>
-normalizeSupplier(
-x.Supplier
-) === supplier
-);
+    return (v || "")
+        .trim()
+        .toUpperCase();
 
 }
 
-if(year !== "ALL"){
+function populateFilters() {
 
-data =
-data.filter(
-x =>
-String(
-x["NCR NCR Year"]
-) === year
-);
+    const supplierFilter =
+        document.getElementById(
+            "supplierFilter"
+        );
 
-}
+    const yearFilter =
+        document.getElementById(
+            "yearFilter"
+        );
 
-updateKPI(data);
+    const supplierList =
+        [
+            ...new Set(
+                rawData.map(
+                    x => normalizeSupplier(
+                        x.Supplier
+                    )
+                )
+            )
+        ].sort();
 
-buildCharts(data);
+    supplierList.forEach(s => {
 
-buildTable(data);
+        const option =
+            document.createElement("option");
 
-}
+        option.value = s;
+        option.textContent = s;
 
-function updateKPI(data){
+        supplierFilter.appendChild(option);
 
-document.getElementById(
-"totalNcr"
-).textContent =
-data.length;
+    });
 
-document.getElementById(
-"totalQty"
-).textContent =
-data.reduce(
-(a,b)=>
-a+(Number(
-b.Quantity
-)||0),0
-);
+    const years =
+        [
+            ...new Set(
+                rawData.map(
+                    x => x["NCR NCR Year"]
+                )
+            )
+        ].sort();
 
-document.getElementById(
-"totalSupplier"
-).textContent =
-new Set(
-data.map(
-x=>normalizeSupplier(
-x.Supplier
-)
-)
-).size;
+    years.forEach(y => {
 
-document.getElementById(
-"totalPart"
-).textContent =
-new Set(
-data.map(
-x=>x.Part
-)
-).size;
+        const option =
+            document.createElement("option");
 
-document.getElementById(
-"openNcr"
-).textContent =
-data.filter(
-x=>
-String(
-x["NCR Close date"]
-)
-.toUpperCase()
-!=="CLOSE"
-).length;
+        option.value = y;
+        option.textContent = y;
+
+        yearFilter.appendChild(option);
+
+    });
+
+    supplierFilter.onchange =
+        renderDashboard;
+
+    yearFilter.onchange =
+        renderDashboard;
 
 }
 
-function countBy(data,key){
+function renderDashboard() {
 
-const obj={};
+    const supplier =
+        document.getElementById(
+            "supplierFilter"
+        ).value;
 
-data.forEach(row=>{
+    const year =
+        document.getElementById(
+            "yearFilter"
+        ).value;
 
-const value =
-row[key] || "Unknown";
+    let data =
+        rawData;
 
-obj[value] =
-(obj[value] || 0)+1;
+    if (supplier) {
 
-});
+        data =
+            data.filter(
+                x =>
+                    normalizeSupplier(
+                        x.Supplier
+                    ) === supplier
+            );
 
-return obj;
+    }
+
+    if (year) {
+
+        data =
+            data.filter(
+                x =>
+                    String(
+                        x["NCR NCR Year"]
+                    ) === year
+            );
+
+    }
+
+    updateKPI(data);
+
+    buildCharts(data);
+
+}
+
+function updateKPI(data) {
+
+    document.getElementById(
+        "totalNcr"
+    ).textContent =
+        data.length;
+
+    document.getElementById(
+        "totalQty"
+    ).textContent =
+        data.reduce(
+            (a, b) =>
+                a +
+                (
+                    Number(
+                        b.Quantity
+                    ) || 0
+                ),
+            0
+        );
+
+    document.getElementById(
+        "totalSupplier"
+    ).textContent =
+        new Set(
+            data.map(
+                x =>
+                    normalizeSupplier(
+                        x.Supplier
+                    )
+            )
+        ).size;
+
+    document.getElementById(
+        "totalPart"
+    ).textContent =
+        new Set(
+            data.map(
+                x => x.Part
+            )
+        ).size;
+
+    document.getElementById(
+        "openNcr"
+    ).textContent =
+        data.filter(
+            x =>
+                String(
+                    x["NCR Close date"]
+                )
+                    .toUpperCase()
+                    !== "CLOSE"
+        ).length;
+
+}
+
+function countBy(data, key) {
+
+    const obj = {};
+
+    data.forEach(row => {
+
+        const value =
+            row[key] ||
+            "Unknown";
+
+        obj[value] =
+            (obj[value] || 0)
+            + 1;
+
+    });
+
+    return obj;
 
 }
 
 function drawChart(
-chartRef,
-canvasId,
-title,
-countObj
-){
+    chartRef,
+    canvasId,
+    title,
+    countObj
+) {
 
-if(chartRef)
-chartRef.destroy();
+    if (chartRef)
+        chartRef.destroy();
 
-return new Chart(
-document.getElementById(
-canvasId
-),
-{
-type:"bar",
-data:{
-labels:Object.keys(countObj),
-datasets:[{
-label:title,
-data:Object.values(countObj)
-}]
-},
-options:{
-responsive:true,
-plugins:{
-title:{
-display:true,
-text:title
-}
-}
-}
-}
-);
+    return new Chart(
+        document.getElementById(
+            canvasId
+        ),
+        {
+            type: "bar",
 
-}
+            data: {
 
-function buildCharts(data){
+                labels:
+                    Object.keys(
+                        countObj
+                    ),
 
-supplierChart =
-drawChart(
-supplierChart,
-"supplierChart",
-"NCR by Supplier",
-countBy(data,"Supplier")
-);
+                datasets: [
+                    {
+                        label:
+                            title,
 
-yearChart =
-drawChart(
-yearChart,
-"yearChart",
-"NCR by Year",
-countBy(
-data,
-"NCR NCR Year"
-)
-);
+                        data:
+                            Object.values(
+                                countObj
+                            ),
 
-monthChart =
-drawChart(
-monthChart,
-"monthChart",
-"NCR by Month",
-countBy(
-data,
-"NCR Month"
-)
-);
+                        backgroundColor:
+                            "#228be6"
+                    }
+                ]
+            },
 
-statusChart =
-drawChart(
-statusChart,
-"statusChart",
-"Replacement Status",
-countBy(
-data,
-"Replacement Status"
-)
-);
+            options: {
 
-const partCount =
-countBy(
-data,
-"Part"
-);
+                responsive: true,
 
-const sortedParts =
-Object.entries(
-partCount
-)
-.sort(
-(a,b)=>
-b[1]-a[1]
-)
-.slice(0,10);
+                maintainAspectRatio:
+                    false,
 
-partChart =
-drawChart(
-partChart,
-"partChart",
-"Top 10 Parts",
-Object.fromEntries(
-sortedParts
-)
-);
+                plugins: {
 
-phenomenonChart =
-drawChart(
-phenomenonChart,
-"phenomenonChart",
-"Phenomenon",
-countBy(
-data,
-"Phenomenon"
-)
-);
+                    legend: {
+                        display: false
+                    }
+
+                },
+
+                scales: {
+
+                    y: {
+                        beginAtZero: true
+                    }
+
+                }
+
+            }
+
+        }
+    );
 
 }
 
-function buildTable(data){
+function buildCharts(data) {
 
-const tbody =
-document.querySelector(
-"#detailTable tbody"
-);
+    supplierChart =
+        drawChart(
+            supplierChart,
+            "supplierChart",
+            "Supplier NCR",
+            countBy(
+                data,
+                "Supplier"
+            )
+        );
 
-tbody.innerHTML =
-data.slice(0,100)
-.map(r=>`
-<tr>
-<td>${r.Supplier||""}</td>
-<td>${r.Part||""}</td>
-<td>${r.Phenomenon||""}</td>
-<td>${r.Quantity||""}</td>
-<td>${r["NCR NCR Year"]||""}</td>
-</tr>
-`)
-.join("");
+    yearChart =
+        drawChart(
+            yearChart,
+            "yearChart",
+            "NCR by Year",
+            countBy(
+                data,
+                "NCR NCR Year"
+            )
+        );
+
+    monthChart =
+        drawChart(
+            monthChart,
+            "monthChart",
+            "NCR by Month",
+            countBy(
+                data,
+                "NCR Month"
+            )
+        );
+
+    statusChart =
+        drawChart(
+            statusChart,
+            "statusChart",
+            "Replacement Status",
+            countBy(
+                data,
+                "Replacement Status"
+            )
+        );
+
+    const topParts =
+        Object.entries(
+            countBy(
+                data,
+                "Part"
+            )
+        )
+            .sort(
+                (a, b) =>
+                    b[1] - a[1]
+            )
+            .slice(0, 10);
+
+    partChart =
+        drawChart(
+            partChart,
+            "partChart",
+            "Top 10 Parts",
+            Object.fromEntries(
+                topParts
+            )
+        );
+
+    phenomenonChart =
+        drawChart(
+            phenomenonChart,
+            "phenomenonChart",
+            "Phenomenon",
+            countBy(
+                data,
+                "Phenomenon"
+            )
+        );
 
 }
 
