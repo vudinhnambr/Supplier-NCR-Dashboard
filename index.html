@@ -2,40 +2,49 @@
 <html>
 
 <head>
+
 <meta charset="UTF-8">
-<title>Supplier NCR Performance Dashboard</title>
+
+<title>Supplier NCR Dashboard</title>
+
+<link rel="stylesheet" href="styles.css">
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
 
 <div class="container">
 
-    <div class="sidebar">
+    <aside class="sidebar">
 
         <div class="logo">
             NCR
         </div>
 
-        <div class="logo-sub">
+        <div class="sub-logo">
             Supplier Performance Dashboard
         </div>
 
-        <div class="filter-group">
+        <div class="filter-section">
+
             <label>Supplier</label>
+
             <select id="supplierFilter">
                 <option value="">All Suppliers</option>
             </select>
+
         </div>
 
-        <div class="filter-group">
+        <div class="filter-section">
+
             <label>Year</label>
+
             <select id="yearFilter">
                 <option value="">All Years</option>
             </select>
+
         </div>
 
         <button
@@ -44,25 +53,25 @@
             Reset
         </button>
 
-    </div>
+    </aside>
 
-    <div class="main">
+    <main class="main">
 
         <div class="header">
 
             <div>
 
-                <div class="page-title">
+                <h1>
                     SUPPLIER PERFORMANCE
-                </div>
+                </h1>
 
-                <div class="page-sub">
+                <span>
                     NCR Analytics Dashboard
-                </div>
+                </span>
 
             </div>
 
-            <div class="info-box">
+            <div class="header-info">
 
                 <div class="info-card">
                     Live NCR Data
@@ -76,7 +85,7 @@
 
         </div>
 
-        <div class="kpi-grid">
+        <section class="kpi-grid">
 
             <div class="kpi-card">
                 <h4>Total NCR</h4>
@@ -103,11 +112,11 @@
                 <span id="openNcr">0</span>
             </div>
 
-        </div>
+        </section>
 
-        <div class="charts-grid">
+        <section class="charts">
 
-            <div class="chart-card wide">
+            <div class="chart-card full">
                 <h3>Supplier NCR Ranking</h3>
                 <canvas id="supplierChart"></canvas>
             </div>
@@ -132,19 +141,18 @@
                 <canvas id="phenomenonChart"></canvas>
             </div>
 
-            <div class="chart-card wide">
+            <div class="chart-card full">
                 <h3>Replacement Status</h3>
                 <canvas id="statusChart"></canvas>
             </div>
 
-        </div>
+        </section>
 
-    </div>
+    </main>
 
 </div>
 
 <script src="app.js"></script>
 
 </body>
-
 </html>
