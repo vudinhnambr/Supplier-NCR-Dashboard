@@ -7,12 +7,19 @@ let statusChart;
 let partChart;
 let phenomenonChart;
 
+let selectedSupplier = null;
+let selectedYear = null;
+let selectedMonth = null;
+
+const chartColor = "#3b9cff";
+const chartBorder = "#66b3ff";
+
 async function loadData() {
 
     try {
 
         const response =
-            await fetch('/api/ncr');
+            await fetch("/api/ncr");
 
         const data =
             await response.json();
@@ -35,7 +42,7 @@ async function loadData() {
 
 function normalizeSupplier(v) {
 
-    return (v || "")
+    return String(v || "")
         .trim()
         .toUpperCase();
 
@@ -53,18 +60,16 @@ function populateFilters() {
             "yearFilter"
         );
 
-    const supplierList =
-        [
-            ...new Set(
-                rawData.map(
-                    x => normalizeSupplier(
-                        x.Supplier
-                    )
+    const suppliers =
+        [...new Set(
+            rawData.map(
+                x => normalizeSupplier(
+                    x.Supplier
                 )
             )
-        ].sort();
+        )].sort();
 
-    supplierList.forEach(s => {
+    suppliers.forEach(s => {
 
         const option =
             document.createElement("option");
@@ -72,18 +77,19 @@ function populateFilters() {
         option.value = s;
         option.textContent = s;
 
-        supplierFilter.appendChild(option);
+        supplierFilter.appendChild(
+            option
+        );
 
     });
 
     const years =
-        [
-            ...new Set(
-                rawData.map(
-                    x => x["NCR NCR Year"]
-                )
+        [...new Set(
+            rawData.map(
+                x =>
+                    x["NCR NCR Year"]
             )
-        ].sort();
+        )].sort();
 
     years.forEach(y => {
 
@@ -93,56 +99,83 @@ function populateFilters() {
         option.value = y;
         option.textContent = y;
 
-        yearFilter.appendChild(option);
+        yearFilter.appendChild(
+            option
+        );
 
     });
 
     supplierFilter.onchange =
-        renderDashboard;
+        () => {
+
+            selectedSupplier =
+                supplierFilter.value;
+
+            renderDashboard();
+
+        };
 
     yearFilter.onchange =
-        renderDashboard;
+        () => {
+
+            selectedYear =
+                yearFilter.value;
+
+            renderDashboard();
+
+        };
 
 }
 
-function renderDashboard() {
+function getFilteredData() {
 
-    const supplier =
-        document.getElementById(
-            "supplierFilter"
-        ).value;
+    let data = [...rawData];
 
-    const year =
-        document.getElementById(
-            "yearFilter"
-        ).value;
-
-    let data =
-        rawData;
-
-    if (supplier) {
+    if (selectedSupplier) {
 
         data =
             data.filter(
                 x =>
                     normalizeSupplier(
                         x.Supplier
-                    ) === supplier
+                    ) === selectedSupplier
             );
 
     }
 
-    if (year) {
+    if (selectedYear) {
 
         data =
             data.filter(
                 x =>
                     String(
                         x["NCR NCR Year"]
-                    ) === year
+                    ) === String(
+                        selectedYear
+                    )
             );
 
     }
+
+    if (selectedMonth) {
+
+        data =
+            data.filter(
+                x =>
+                    x["NCR Month"]
+                    === selectedMonth
+            );
+
+    }
+
+    return data;
+
+}
+
+function renderDashboard() {
+
+    const data =
+        getFilteredData();
 
     updateKPI(data);
 
@@ -161,7 +194,7 @@ function updateKPI(data) {
         "totalQty"
     ).textContent =
         data.reduce(
-            (a, b) =>
+            (a,b)=>
                 a +
                 (
                     Number(
@@ -200,17 +233,17 @@ function updateKPI(data) {
                 String(
                     x["NCR Close date"]
                 )
-                    .toUpperCase()
-                    !== "CLOSE"
+                .toUpperCase()
+                !== "CLOSE"
         ).length;
 
 }
 
-function countBy(data, key) {
+function countBy(data,key){
 
     const obj = {};
 
-    data.forEach(row => {
+    data.forEach(row=>{
 
         const value =
             row[key] ||
@@ -226,65 +259,97 @@ function countBy(data, key) {
 
 }
 
-function drawChart(
-    chartRef,
-    canvasId,
-    title,
-    countObj
-) {
+function destroyChart(chart){
 
-    if (chartRef)
-        chartRef.destroy();
+    if(chart)
+        chart.destroy();
+
+}
+
+function createBarChart(
+    canvasId,
+    labels,
+    values,
+    title,
+    horizontal=false,
+    clickCallback=null
+){
 
     return new Chart(
+
         document.getElementById(
             canvasId
         ),
+
         {
-            type: "bar",
 
-            data: {
+            type:"bar",
 
-                labels:
-                    Object.keys(
-                        countObj
-                    ),
+            data:{
 
-                datasets: [
-                    {
-                        label:
-                            title,
+                labels,
 
-                        data:
-                            Object.values(
-                                countObj
-                            ),
+                datasets:[{
 
-                        backgroundColor:
-                            "#228be6"
-                    }
-                ]
+                    label:title,
+
+                    data:values,
+
+                    backgroundColor:
+                        chartColor,
+
+                    borderColor:
+                        chartBorder,
+
+                    borderWidth:1
+
+                }]
+
             },
 
-            options: {
+            options:{
 
-                responsive: true,
+                responsive:true,
 
-                maintainAspectRatio:
-                    false,
+                maintainAspectRatio:false,
 
-                plugins: {
+                indexAxis:
+                    horizontal
+                    ? "y"
+                    : "x",
 
-                    legend: {
-                        display: false
+                plugins:{
+
+                    legend:{
+                        display:false
                     }
 
                 },
 
-                scales: {
+                onClick:
+                    clickCallback,
 
-                    y: {
-                        beginAtZero: true
+                scales:{
+
+                    y:{
+                        beginAtZero:true,
+                        ticks:{
+                            color:"#d7e5ff"
+                        },
+                        grid:{
+                            color:
+                            "rgba(255,255,255,.08)"
+                        }
+                    },
+
+                    x:{
+                        ticks:{
+                            color:"#d7e5ff"
+                        },
+                        grid:{
+                            color:
+                            "rgba(255,255,255,.05)"
+                        }
                     }
 
                 }
@@ -292,55 +357,191 @@ function drawChart(
             }
 
         }
+
     );
 
 }
 
-function buildCharts(data) {
+function buildCharts(data){
+
+    buildSupplierChart(data);
+
+    buildYearChart(data);
+
+    buildMonthChart(data);
+
+    buildStatusChart(data);
+
+    buildPartChart(data);
+
+    buildPhenomenonChart(data);
+
+}
+
+function buildSupplierChart(data){
+
+    destroyChart(
+        supplierChart
+    );
+
+    const obj =
+        countBy(
+            data,
+            "Supplier"
+        );
+
+    const sorted =
+        Object.entries(obj)
+        .sort(
+            (a,b)=>
+                b[1]-a[1]
+        );
 
     supplierChart =
-        drawChart(
-            supplierChart,
+        createBarChart(
             "supplierChart",
+            sorted.map(x=>x[0]),
+            sorted.map(x=>x[1]),
             "Supplier NCR",
-            countBy(
-                data,
-                "Supplier"
-            )
+            false,
+            (evt,elements)=>{
+
+                if(!elements.length)
+                    return;
+
+                selectedSupplier =
+                    sorted[
+                        elements[0].index
+                    ][0];
+
+                document
+                    .getElementById(
+                        "supplierFilter"
+                    )
+                    .value =
+                        normalizeSupplier(
+                            selectedSupplier
+                        );
+
+                renderDashboard();
+
+            }
+        );
+
+}
+
+function buildYearChart(data){
+
+    destroyChart(yearChart);
+
+    const obj =
+        countBy(
+            data,
+            "NCR NCR Year"
+        );
+
+    const years =
+        Object.keys(obj)
+        .sort(
+            (a,b)=>a-b
         );
 
     yearChart =
-        drawChart(
-            yearChart,
+        createBarChart(
             "yearChart",
-            "NCR by Year",
-            countBy(
-                data,
-                "NCR NCR Year"
-            )
+            years,
+            years.map(
+                y=>obj[y]
+            ),
+            "NCR by Year"
         );
 
+}
+
+function buildMonthChart(data){
+
+    destroyChart(monthChart);
+
+    const months = [
+
+        "Jan","Feb","Mar",
+        "Apr","May","Jun",
+        "Jul","Aug","Sep",
+        "Oct","Nov","Dec"
+
+    ];
+
+    const count = {};
+
+    months.forEach(
+        m=>count[m]=0
+    );
+
+    data.forEach(row=>{
+
+        const month =
+            row["NCR Month"];
+
+        if(
+            count[month]
+            !== undefined
+        ){
+
+            count[month]++;
+
+        }
+
+    });
+
     monthChart =
-        drawChart(
-            monthChart,
+        createBarChart(
             "monthChart",
+            months,
+            months.map(
+                m=>count[m]
+            ),
             "NCR by Month",
-            countBy(
-                data,
-                "NCR Month"
-            )
+            false,
+            (evt,elements)=>{
+
+                if(!elements.length)
+                    return;
+
+                selectedMonth =
+                    months[
+                        elements[0].index
+                    ];
+
+                renderDashboard();
+
+            }
+        );
+
+}
+
+function buildStatusChart(data){
+
+    destroyChart(statusChart);
+
+    const obj =
+        countBy(
+            data,
+            "Replacement Status"
         );
 
     statusChart =
-        drawChart(
-            statusChart,
+        createBarChart(
             "statusChart",
-            "Replacement Status",
-            countBy(
-                data,
-                "Replacement Status"
-            )
+            Object.keys(obj),
+            Object.values(obj),
+            "Replacement Status"
         );
+
+}
+
+function buildPartChart(data){
+
+    destroyChart(partChart);
 
     const topParts =
         Object.entries(
@@ -349,31 +550,57 @@ function buildCharts(data) {
                 "Part"
             )
         )
-            .sort(
-                (a, b) =>
-                    b[1] - a[1]
-            )
-            .slice(0, 10);
+        .sort(
+            (a,b)=>
+                b[1]-a[1]
+        )
+        .slice(0,10);
 
     partChart =
-        drawChart(
-            partChart,
+        createBarChart(
             "partChart",
-            "Top 10 Parts",
-            Object.fromEntries(
-                topParts
-            )
+            topParts.map(
+                x=>x[0]
+            ),
+            topParts.map(
+                x=>x[1]
+            ),
+            "Top Parts",
+            true
+        );
+
+}
+
+function buildPhenomenonChart(data){
+
+    destroyChart(
+        phenomenonChart
+    );
+
+    const obj =
+        countBy(
+            data,
+            "Phenomenon"
+        );
+
+    const sorted =
+        Object.entries(obj)
+        .sort(
+            (a,b)=>
+                b[1]-a[1]
         );
 
     phenomenonChart =
-        drawChart(
-            phenomenonChart,
+        createBarChart(
             "phenomenonChart",
+            sorted.map(
+                x=>x[0]
+            ),
+            sorted.map(
+                x=>x[1]
+            ),
             "Phenomenon",
-            countBy(
-                data,
-                "Phenomenon"
-            )
+            true
         );
 
 }
