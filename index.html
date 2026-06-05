@@ -1,158 +1,113 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Supplier NCR Dashboard</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <div class="container">
+      <aside class="sidebar">
+        <div class="logo">NCR</div>
+        <div class="sub-logo">Supplier Performance Dashboard</div>
 
-<head>
-
-<meta charset="UTF-8">
-
-<title>Supplier NCR Dashboard</title>
-
-<link rel="stylesheet" href="styles.css">
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-</head>
-
-<body>
-
-<div class="container">
-
-    <aside class="sidebar">
-
-        <div class="logo">
-            NCR
-        </div>
-
-        <div class="sub-logo">
-            Supplier Performance Dashboard
+        <div class="filter-section">
+          <label for="supplierFilter">Supplier</label>
+          <select id="supplierFilter">
+            <option value="">All Suppliers</option>
+          </select>
         </div>
 
         <div class="filter-section">
-
-            <label>Supplier</label>
-
-            <select id="supplierFilter">
-                <option value="">All Suppliers</option>
-            </select>
-
+          <label for="yearFilter">Year</label>
+          <select id="yearFilter">
+            <option value="">All Years</option>
+          </select>
         </div>
 
-        <div class="filter-section">
+        <button id="resetButton" class="reset-btn" type="button">Reset</button>
 
-            <label>Year</label>
-
-            <select id="yearFilter">
-                <option value="">All Years</option>
-            </select>
-
+        <div class="source-box">
+          <span>Google Drive Excel</span>
+          <strong id="dataStatus">Waiting for data...</strong>
         </div>
+      </aside>
 
-        <button
-            class="reset-btn"
-            onclick="location.reload()">
-            Reset
-        </button>
+      <main class="main">
+        <header class="header">
+          <div>
+            <h1>SUPPLIER PERFORMANCE</h1>
+            <span>NCR Analytics Dashboard</span>
+          </div>
 
-    </aside>
+          <div class="header-info">
+            <div class="info-card">Live NCR Data</div>
+            <div class="info-card">Vercel API Connected</div>
+          </div>
+        </header>
 
-    <main class="main">
+        <section class="kpi-grid" aria-label="NCR KPI summary">
+          <div class="kpi-card">
+            <h4>Total NCR</h4>
+            <span id="totalNcr">0</span>
+          </div>
 
-        <div class="header">
+          <div class="kpi-card">
+            <h4>Total Qty</h4>
+            <span id="totalQty">0</span>
+          </div>
 
-            <div>
+          <div class="kpi-card">
+            <h4>Suppliers</h4>
+            <span id="totalSupplier">0</span>
+          </div>
 
-                <h1>
-                    SUPPLIER PERFORMANCE
-                </h1>
+          <div class="kpi-card">
+            <h4>Parts</h4>
+            <span id="totalPart">0</span>
+          </div>
 
-                <span>
-                    NCR Analytics Dashboard
-                </span>
-
-            </div>
-
-            <div class="header-info">
-
-                <div class="info-card">
-                    Live NCR Data
-                </div>
-
-                <div class="info-card">
-                    Google Sheet Connected
-                </div>
-
-            </div>
-
-        </div>
-
-        <section class="kpi-grid">
-
-            <div class="kpi-card">
-                <h4>Total NCR</h4>
-                <span id="totalNcr">0</span>
-            </div>
-
-            <div class="kpi-card">
-                <h4>Total Qty</h4>
-                <span id="totalQty">0</span>
-            </div>
-
-            <div class="kpi-card">
-                <h4>Suppliers</h4>
-                <span id="totalSupplier">0</span>
-            </div>
-
-            <div class="kpi-card">
-                <h4>Parts</h4>
-                <span id="totalPart">0</span>
-            </div>
-
-            <div class="kpi-card">
-                <h4>Open NCR</h4>
-                <span id="openNcr">0</span>
-            </div>
-
+          <div class="kpi-card">
+            <h4>Open NCR</h4>
+            <span id="openNcr">0</span>
+          </div>
         </section>
 
-        <section class="charts">
+        <section class="charts" aria-label="NCR charts">
+          <div class="chart-card full">
+            <h3>Supplier NCR Ranking</h3>
+            <canvas id="supplierChart"></canvas>
+          </div>
 
-            <div class="chart-card full">
-                <h3>Supplier NCR Ranking</h3>
-                <canvas id="supplierChart"></canvas>
-            </div>
+          <div class="chart-card">
+            <h3>NCR by Year</h3>
+            <canvas id="yearChart"></canvas>
+          </div>
 
-            <div class="chart-card">
-                <h3>NCR by Year</h3>
-                <canvas id="yearChart"></canvas>
-            </div>
+          <div class="chart-card">
+            <h3>NCR by Month</h3>
+            <canvas id="monthChart"></canvas>
+          </div>
 
-            <div class="chart-card">
-                <h3>NCR by Month</h3>
-                <canvas id="monthChart"></canvas>
-            </div>
+          <div class="chart-card">
+            <h3>Top Parts</h3>
+            <canvas id="partChart"></canvas>
+          </div>
 
-            <div class="chart-card">
-                <h3>Top Parts</h3>
-                <canvas id="partChart"></canvas>
-            </div>
+          <div class="chart-card">
+            <h3>Phenomenon</h3>
+            <canvas id="phenomenonChart"></canvas>
+          </div>
 
-            <div class="chart-card">
-                <h3>Phenomenon</h3>
-                <canvas id="phenomenonChart"></canvas>
-            </div>
-
-            <div class="chart-card full">
-                <h3>Replacement Status</h3>
-                <canvas id="statusChart"></canvas>
-            </div>
-
+          <div class="chart-card full">
+            <h3>Replacement Status</h3>
+            <canvas id="statusChart"></canvas>
+          </div>
         </section>
-
-    </main>
-
-</div>
-
-<script src="app.js"></script>
-
-</body>
+      </main>
+    </div>
+  </body>
 </html>
