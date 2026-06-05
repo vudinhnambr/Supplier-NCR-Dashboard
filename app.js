@@ -1,123 +1,170 @@
 async function loadData() {
 
-const response =
-await fetch('/api/ncr');
+  try {
 
-const data =
-await response.json();
+    console.log("Loading data...");
 
-document.getElementById('totalNcr')
-.textContent = data.length;
+    const response =
+      await fetch('/api/ncr');
 
-const suppliers =
-[...new Set(
-data.map(x => x.Supplier)
-)];
+    console.log(
+      "Response Status:",
+      response.status
+    );
 
-document.getElementById('totalSupplier')
-.textContent = suppliers.length;
+    const text =
+      await response.text();
 
-const qty =
-data.reduce(
-(a, b) =>
-a + (Number(b.Quantity) || 0),
-0
-);
+    console.log(
+      "Raw Response:",
+      text
+    );
 
-document.getElementById('totalQty')
-.textContent = qty;
+    const data =
+      JSON.parse(text);
 
-const parts =
-[...new Set(
-data.map(x => x.Part)
-)];
+    console.log(
+      "Total Rows:",
+      data.length
+    );
 
-document.getElementById('totalPart')
-.textContent = parts.length;
+    document.getElementById('totalNcr')
+      .textContent = data.length;
 
-buildSupplierChart(data);
-buildYearChart(data);
+    const suppliers =
+      [...new Set(
+        data.map(x => x.Supplier)
+      )];
 
-const tbody =
-document.querySelector(
-'#detailTable tbody'
-);
+    document.getElementById('totalSupplier')
+      .textContent = suppliers.length;
 
-tbody.innerHTML =
-data.slice(0, 100)
-.map(r => `       <tr>         <td>${r.Supplier || ''}</td>         <td>${r.Part || ''}</td>         <td>${r.Phenomenon || ''}</td>         <td>${r.Quantity || ''}</td>       </tr>
-    `)
-.join('');
+    const qty =
+      data.reduce(
+        (a, b) =>
+          a + (Number(b.Quantity) || 0),
+        0
+      );
+
+    document.getElementById('totalQty')
+      .textContent = qty;
+
+    const parts =
+      [...new Set(
+        data.map(x => x.Part)
+      )];
+
+    document.getElementById('totalPart')
+      .textContent = parts.length;
+
+    buildSupplierChart(data);
+
+    buildYearChart(data);
+
+    const tbody =
+      document.querySelector(
+        '#detailTable tbody'
+      );
+
+    tbody.innerHTML =
+      data.slice(0, 100)
+      .map(r => `
+        <tr>
+          <td>${r.Supplier || ''}</td>
+          <td>${r.Part || ''}</td>
+          <td>${r.Phenomenon || ''}</td>
+          <td>${r.Quantity || ''}</td>
+        </tr>
+      `)
+      .join('');
+
+  } catch (err) {
+
+    console.error(
+      "LOAD DATA ERROR:",
+      err
+    );
+
+  }
+
 }
 
 function buildSupplierChart(data) {
 
-const count = {};
+  const count = {};
 
-data.forEach(row => {
+  data.forEach(row => {
 
-```
-const supplier =
-  row.Supplier || 'Unknown';
+    const supplier =
+      row.Supplier || 'Unknown';
 
-count[supplier] =
-  (count[supplier] || 0) + 1;
-```
+    count[supplier] =
+      (count[supplier] || 0) + 1;
 
-});
+  });
 
-new Chart(
-document.getElementById(
-'supplierChart'
-),
-{
-type: 'bar',
-data: {
-labels:
-Object.keys(count),
-datasets: [{
-label: 'NCR',
-data:
-Object.values(count)
-}]
-}
-}
-);
+  const canvas =
+    document.getElementById(
+      'supplierChart'
+    );
+
+  if (!canvas) {
+    console.error(
+      "supplierChart not found"
+    );
+    return;
+  }
+
+  new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: Object.keys(count),
+      datasets: [{
+        label: 'NCR',
+        data: Object.values(count)
+      }]
+    }
+  });
+
 }
 
 function buildYearChart(data) {
 
-const count = {};
+  const count = {};
 
-data.forEach(row => {
+  data.forEach(row => {
 
-```
-const year =
-  row["NCR NCR Year"];
+    const year =
+      row["NCR NCR Year"];
 
-count[year] =
-  (count[year] || 0) + 1;
-```
+    count[year] =
+      (count[year] || 0) + 1;
 
-});
+  });
 
-new Chart(
-document.getElementById(
-'yearChart'
-),
-{
-type: 'bar',
-data: {
-labels:
-Object.keys(count),
-datasets: [{
-label: 'NCR',
-data:
-Object.values(count)
-}]
-}
-}
-);
+  const canvas =
+    document.getElementById(
+      'yearChart'
+    );
+
+  if (!canvas) {
+    console.error(
+      "yearChart not found"
+    );
+    return;
+  }
+
+  new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: Object.keys(count),
+      datasets: [{
+        label: 'NCR',
+        data: Object.values(count)
+      }]
+    }
+  });
+
 }
 
 loadData();
