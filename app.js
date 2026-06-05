@@ -23,7 +23,7 @@ const columnAliases = {
   phenomenon: ["Phenomenon", "Defect", "Issue", "Lỗi", "Loi", "Hiện tượng", "Hien tuong"],
   replacement: ["Replacement Status", "Status", "Disposition"],
   closeDate: ["NCR Close date", "NCR Close Date", "Close Date", "Closed Date"],
-  status: ["NCR Status", "Status", "Close Status"]
+  status: ["NCR Status", "Status", "Close Status", "Current status", "Notice Status"]
 };
 
 let columns = {};
@@ -165,6 +165,7 @@ function buildSupplierChart(data) {
 
   supplierChart = createBarChart("supplierChart", entries, "Supplier NCR", false, elements => {
     if (!elements.length) return;
+
     selectedSupplier = entries[elements[0].index].label;
     document.getElementById("supplierFilter").value = selectedSupplier;
     renderDashboard();
@@ -177,13 +178,22 @@ function buildYearChart(data) {
   const entries = groupCount(data, columns.year, toYear)
     .sort((a, b) => Number(a.label) - Number(b.label));
 
-  yearChart = createBarChart("yearChart", entries, "NCR by Year");
+  yearChart = createBarChart("yearChart", entries, "NCR by Year", false, elements => {
+    if (!elements.length) return;
+
+    const year = entries[elements[0].index].label;
+    selectedYear = selectedYear === year ? "" : year;
+
+    document.getElementById("yearFilter").value = selectedYear;
+    renderDashboard();
+  });
 }
 
 function buildMonthChart(data) {
   monthChart?.destroy();
 
   const counts = Object.fromEntries(MONTHS.map(month => [month, 0]));
+
   data.forEach(row => {
     const month = toMonth(valueOf(row, columns.month));
     if (month in counts) counts[month] += 1;
@@ -193,7 +203,9 @@ function buildMonthChart(data) {
 
   monthChart = createBarChart("monthChart", entries, "NCR by Month", false, elements => {
     if (!elements.length) return;
-    selectedMonth = MONTHS[elements[0].index];
+
+    const month = MONTHS[elements[0].index];
+    selectedMonth = selectedMonth === month ? "" : month;
     renderDashboard();
   });
 }
@@ -399,6 +411,7 @@ function setStatus(message) {
 
 function formatRefreshTime(value) {
   if (!value) return "";
+
   return new Date(value).toLocaleString("en-US", {
     hour12: false,
     year: "numeric",
