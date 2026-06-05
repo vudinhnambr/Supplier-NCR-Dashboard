@@ -1,169 +1,352 @@
+let rawData = [];
+
+let supplierChart;
+let yearChart;
+let monthChart;
+let statusChart;
+let partChart;
+let phenomenonChart;
+
 async function loadData() {
 
-  try {
+const response =
+await fetch('/api/ncr');
 
-    console.log("Loading data...");
+const data =
+await response.json();
 
-    const response =
-      await fetch('/api/ncr');
+rawData = data;
 
-    console.log(
-      "Response Status:",
-      response.status
-    );
+populateFilters();
 
-    const text =
-      await response.text();
-
-    console.log(
-      "Raw Response:",
-      text
-    );
-
-    const data =
-      JSON.parse(text);
-
-    console.log(
-      "Total Rows:",
-      data.length
-    );
-
-    document.getElementById('totalNcr')
-      .textContent = data.length;
-
-    const suppliers =
-      [...new Set(
-        data.map(x => x.Supplier)
-      )];
-
-    document.getElementById('totalSupplier')
-      .textContent = suppliers.length;
-
-    const qty =
-      data.reduce(
-        (a, b) =>
-          a + (Number(b.Quantity) || 0),
-        0
-      );
-
-    document.getElementById('totalQty')
-      .textContent = qty;
-
-    const parts =
-      [...new Set(
-        data.map(x => x.Part)
-      )];
-
-    document.getElementById('totalPart')
-      .textContent = parts.length;
-
-    buildSupplierChart(data);
-
-    buildYearChart(data);
-
-    const tbody =
-      document.querySelector(
-        '#detailTable tbody'
-      );
-
-    tbody.innerHTML =
-      data.slice(0, 100)
-      .map(r => `
-        <tr>
-          <td>${r.Supplier || ''}</td>
-          <td>${r.Part || ''}</td>
-          <td>${r.Phenomenon || ''}</td>
-          <td>${r.Quantity || ''}</td>
-        </tr>
-      `)
-      .join('');
-
-  } catch (err) {
-
-    console.error(
-      "LOAD DATA ERROR:",
-      err
-    );
-
-  }
+renderDashboard();
 
 }
 
-function buildSupplierChart(data) {
+function normalizeSupplier(v){
 
-  const count = {};
-
-  data.forEach(row => {
-
-    const supplier =
-      row.Supplier || 'Unknown';
-
-    count[supplier] =
-      (count[supplier] || 0) + 1;
-
-  });
-
-  const canvas =
-    document.getElementById(
-      'supplierChart'
-    );
-
-  if (!canvas) {
-    console.error(
-      "supplierChart not found"
-    );
-    return;
-  }
-
-  new Chart(canvas, {
-    type: 'bar',
-    data: {
-      labels: Object.keys(count),
-      datasets: [{
-        label: 'NCR',
-        data: Object.values(count)
-      }]
-    }
-  });
+return (v || "")
+.trim()
+.toUpperCase();
 
 }
 
-function buildYearChart(data) {
+function populateFilters(){
 
-  const count = {};
+const supplierList =
+[
+...new Set(
+rawData.map(x =>
+normalizeSupplier(x.Supplier)
+)
+)
+].sort();
 
-  data.forEach(row => {
+const supplierFilter =
+document.getElementById(
+"supplierFilter"
+);
 
-    const year =
-      row["NCR NCR Year"];
+supplierList.forEach(s=>{
 
-    count[year] =
-      (count[year] || 0) + 1;
+const option =
+document.createElement("option");
 
-  });
+option.value=s;
+option.textContent=s;
 
-  const canvas =
-    document.getElementById(
-      'yearChart'
-    );
+supplierFilter.appendChild(option);
 
-  if (!canvas) {
-    console.error(
-      "yearChart not found"
-    );
-    return;
-  }
+});
 
-  new Chart(canvas, {
-    type: 'bar',
-    data: {
-      labels: Object.keys(count),
-      datasets: [{
-        label: 'NCR',
-        data: Object.values(count)
-      }]
-    }
-  });
+const years =
+[
+...new Set(
+rawData.map(
+x=>x["NCR NCR Year"]
+)
+)
+].sort();
+
+const yearFilter =
+document.getElementById(
+"yearFilter"
+);
+
+years.forEach(y=>{
+
+const option =
+document.createElement("option");
+
+option.value=y;
+option.textContent=y;
+
+yearFilter.appendChild(option);
+
+});
+
+supplierFilter.onchange=
+renderDashboard;
+
+yearFilter.onchange=
+renderDashboard;
+
+}
+
+function renderDashboard(){
+
+const supplier =
+document.getElementById(
+"supplierFilter"
+).value;
+
+const year =
+document.getElementById(
+"yearFilter"
+).value;
+
+let data =
+rawData;
+
+if(supplier !== "ALL"){
+
+data =
+data.filter(
+x =>
+normalizeSupplier(
+x.Supplier
+) === supplier
+);
+
+}
+
+if(year !== "ALL"){
+
+data =
+data.filter(
+x =>
+String(
+x["NCR NCR Year"]
+) === year
+);
+
+}
+
+updateKPI(data);
+
+buildCharts(data);
+
+buildTable(data);
+
+}
+
+function updateKPI(data){
+
+document.getElementById(
+"totalNcr"
+).textContent =
+data.length;
+
+document.getElementById(
+"totalQty"
+).textContent =
+data.reduce(
+(a,b)=>
+a+(Number(
+b.Quantity
+)||0),0
+);
+
+document.getElementById(
+"totalSupplier"
+).textContent =
+new Set(
+data.map(
+x=>normalizeSupplier(
+x.Supplier
+)
+)
+).size;
+
+document.getElementById(
+"totalPart"
+).textContent =
+new Set(
+data.map(
+x=>x.Part
+)
+).size;
+
+document.getElementById(
+"openNcr"
+).textContent =
+data.filter(
+x=>
+String(
+x["NCR Close date"]
+)
+.toUpperCase()
+!=="CLOSE"
+).length;
+
+}
+
+function countBy(data,key){
+
+const obj={};
+
+data.forEach(row=>{
+
+const value =
+row[key] || "Unknown";
+
+obj[value] =
+(obj[value] || 0)+1;
+
+});
+
+return obj;
+
+}
+
+function drawChart(
+chartRef,
+canvasId,
+title,
+countObj
+){
+
+if(chartRef)
+chartRef.destroy();
+
+return new Chart(
+document.getElementById(
+canvasId
+),
+{
+type:"bar",
+data:{
+labels:Object.keys(countObj),
+datasets:[{
+label:title,
+data:Object.values(countObj)
+}]
+},
+options:{
+responsive:true,
+plugins:{
+title:{
+display:true,
+text:title
+}
+}
+}
+}
+);
+
+}
+
+function buildCharts(data){
+
+supplierChart =
+drawChart(
+supplierChart,
+"supplierChart",
+"NCR by Supplier",
+countBy(data,"Supplier")
+);
+
+yearChart =
+drawChart(
+yearChart,
+"yearChart",
+"NCR by Year",
+countBy(
+data,
+"NCR NCR Year"
+)
+);
+
+monthChart =
+drawChart(
+monthChart,
+"monthChart",
+"NCR by Month",
+countBy(
+data,
+"NCR Month"
+)
+);
+
+statusChart =
+drawChart(
+statusChart,
+"statusChart",
+"Replacement Status",
+countBy(
+data,
+"Replacement Status"
+)
+);
+
+const partCount =
+countBy(
+data,
+"Part"
+);
+
+const sortedParts =
+Object.entries(
+partCount
+)
+.sort(
+(a,b)=>
+b[1]-a[1]
+)
+.slice(0,10);
+
+partChart =
+drawChart(
+partChart,
+"partChart",
+"Top 10 Parts",
+Object.fromEntries(
+sortedParts
+)
+);
+
+phenomenonChart =
+drawChart(
+phenomenonChart,
+"phenomenonChart",
+"Phenomenon",
+countBy(
+data,
+"Phenomenon"
+)
+);
+
+}
+
+function buildTable(data){
+
+const tbody =
+document.querySelector(
+"#detailTable tbody"
+);
+
+tbody.innerHTML =
+data.slice(0,100)
+.map(r=>`
+<tr>
+<td>${r.Supplier||""}</td>
+<td>${r.Part||""}</td>
+<td>${r.Phenomenon||""}</td>
+<td>${r.Quantity||""}</td>
+<td>${r["NCR NCR Year"]||""}</td>
+</tr>
+`)
+.join("");
 
 }
 
