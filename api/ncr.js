@@ -18,16 +18,26 @@ export default async function handler(req, res) {
       }
     );
 
+    const worksheet =
+      workbook.Sheets["Sheet1"];
+
+    const rows =
+      XLSX.utils.sheet_to_json(
+        worksheet,
+        {
+          defval: ""
+        }
+      );
+
     return res.status(200).json({
-      status: "STEP3_OK",
-      sheets: workbook.SheetNames
+      totalRows: rows.length,
+      firstRow: rows[0]
     });
 
   } catch (error) {
 
     return res.status(500).json({
-      error: error.message,
-      stack: error.stack
+      error: error.message
     });
 
   }
