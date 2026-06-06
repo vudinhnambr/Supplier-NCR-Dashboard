@@ -11,6 +11,7 @@ const chartColor = "#2589ff";
 const chartBorder = "#6fb7ff";
 
 const columnAliases = {
+  ncrNo: ["NCR No.", "NCR No", "NCR Number"],
   supplier: ["Supplier", "Vendor", "Nhà cung cấp"],
   year: ["NCR NCR Year", "NCR Year", "Year"],
   month: ["NCR Month", "Month"],
@@ -121,7 +122,7 @@ function renderDashboard() {
 }
 
 function updateKPI(data) {
-  setText("totalNcr", data.length.toLocaleString());
+  setText("totalNcr", distinct(data.map(r => valueOf(r, columns.ncrNo)).filter(Boolean)).length.toLocaleString());
   setText("totalQty", data.reduce((t, r) => t + toNumber(valueOf(r, columns.quantity)), 0).toLocaleString());
   setText("totalSupplier", distinct(data.map(r => normalizeSupplier(valueOf(r, columns.supplier))).filter(Boolean)).length);
   setText("totalPart", distinct(data.map(r => valueOf(r, columns.part)).filter(Boolean)).length);
