@@ -10,18 +10,16 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 const chartColor = "#2589ff";
 const chartBorder = "#6fb7ff";
 
-// CẤU HÌNH CỘT: Map trực tiếp theo tiêu đề trong ảnh của bạn
 const columnAliases = {
-  supplier: ["Supplier"],
-  year: ["NCR NCR Year"],
-  month: ["NCR Month"],
-  quantity: ["Quantity", "Qty"],
-  part: ["Part"],
-  phenomenon: ["Phenomenon"],
+  supplier: ["Supplier", "Vendor", "Nhà cung cấp"],
+  year: ["NCR NCR Year", "NCR Year", "Year"],
+  month: ["NCR Month", "Month"],
+  quantity: ["Quantity", "Qty", "Số lượng"],
+  part: ["Part", "Part Name"],
+  phenomenon: ["Phenomenon", "Defect"],
   replacement: ["Replacement Status", "Status"],
-  // Trong file của bạn, cột L vừa là Status vừa là Close Date
-  status: ["NCR Close date", "Status"], 
-  closeDate: ["NCR Close date"]
+  closeDate: ["NCR Close date", "Close Date"],
+  status: ["NCR Status", "Status", "NCR Close date"]
 };
 
 let columns = {};
@@ -61,17 +59,19 @@ async function loadData() {
     columns = detectColumns(rawData);
     populateFilters();
     renderDashboard();
-    setStatus(`${payload.rowCount.toLocaleString()} dòng | Đã kết nối file Excel`);
+    setStatus(`${payload.rowCount.toLocaleString()} dòng | Dữ liệu đã sẵn sàng`);
   } catch (error) { setStatus(error.message); }
 }
 
-// LOGIC TÍNH TOÁN OPEN NCR (Sửa lại cho file của bạn)
+// --- LOGIC ĐẾM OPEN NCR "BẤT CHẤP" TÊN CỘT ---
 function countOpenNcr(data) {
   return data.filter(row => {
-    // Lấy giá trị tại cột "NCR Close date" (Cột L)
-    const val = normalizeText(valueOf(row, columns.status) || valueOf(row, columns.closeDate));
-    // Nếu giá trị là "open" thì đếm là 1
-    return val === "open";
+    // Quét tất cả các giá trị trong hàng (row)
+    // Nếu có bất kỳ ô nào chứa chữ "Open" (không phân biệt hoa thường)
+    return Object.values(row).some(val => {
+      const text = String(val || "").trim().toLowerCase();
+      return text === "open"; // Khớp chính xác chữ "open"
+    });
   }).length;
 }
 
@@ -104,10 +104,11 @@ function updateKPI(data) {
   setText("totalQty", data.reduce((t, r) => t + toNumber(valueOf(r, columns.quantity)), 0).toLocaleString());
   setText("totalSupplier", distinct(data.map(r => normalizeSupplier(valueOf(r, columns.supplier))).filter(Boolean)).length);
   setText("totalPart", distinct(data.map(r => valueOf(r, columns.part)).filter(Boolean)).length);
-  // Cập nhật số lượng Open NCR
+  // Gọi hàm đếm Open NCR mới
   setText("openNcr", countOpenNcr(data).toLocaleString());
 }
 
+// --- PHẦN BIỂU ĐỒ ---
 function buildCharts(data) {
   buildSupplierChart(data); buildYearChart(data); buildMonthChart(data);
   buildStatusChart(data); buildPartChart(data); buildPhenomenonChart(data);
