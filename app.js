@@ -1,10 +1,12 @@
 let rawData = [];
 let supplierChart, yearChart, monthChart, statusChart, partChart, phenomenonChart;
+
+// Biến trạng thái lọc toàn cục
 let selectedSupplier = "", selectedYear = "", selectedMonth = "";
+let selectedPart = "", selectedPhenomenon = "", selectedStatus = ""; // Thêm mới
 
 const ACTIVE_SUPPLIERS = ["WUXI PAIKE", "SINHOM", "TAESANG"];
-const MASTER_PASSWORD = "CSBearing"; // Mật mã bạn yêu cầu
-
+const MASTER_PASSWORD = "CSBearing";
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const chartColor = "#2589ff";
 const chartBorder = "#6fb7ff";
@@ -25,26 +27,11 @@ let columns = {};
 
 document.addEventListener("DOMContentLoaded", () => {
   const loginBtn = document.getElementById("loginBtn");
-  const passInput = document.getElementById("passInput");
-
-  // Kiểm tra nếu đã đăng nhập trước đó (trong cùng một session)
-  if (sessionStorage.getItem("isLoggedIn") === "true") {
-    showDashboard();
-  }
-
+  if (sessionStorage.getItem("isLoggedIn") === "true") showDashboard();
   loginBtn.addEventListener("click", checkLogin);
-  passInput.addEventListener("keydown", (e) => { if (e.key === "Enter") checkLogin(); });
-
-  document.getElementById("supplierFilter").addEventListener("change", event => {
-    selectedSupplier = event.target.value;
-    renderDashboard();
-  });
-
-  document.getElementById("yearFilter").addEventListener("change", event => {
-    selectedYear = event.target.value;
-    renderDashboard();
-  });
-
+  document.getElementById("passInput").addEventListener("keydown", (e) => { if (e.key === "Enter") checkLogin(); });
+  document.getElementById("supplierFilter").addEventListener("change", e => { selectedSupplier = e.target.value; renderDashboard(); });
+  document.getElementById("yearFilter").addEventListener("change", e => { selectedYear = e.target.value; renderDashboard(); });
   document.getElementById("resetButton").addEventListener("click", resetFilters);
 });
 
@@ -52,7 +39,7 @@ function checkLogin() {
   const input = document.getElementById("passInput").value;
   if (input === MASTER_PASSWORD) {
     sessionStorage.setItem("isLoggedIn", "true");
-    sessionStorage.setItem("authKey", input); // Lưu để gửi lên API
+    sessionStorage.setItem("authKey", input);
     showDashboard();
   } else {
     document.getElementById("loginError").style.display = "block";
@@ -66,72 +53,17 @@ function showDashboard() {
 }
 
 async function loadData() {
-  setStatus("Loading Google Drive Excel data...");
+  setStatus("Đang tải dữ liệu...");
   try {
-    // Gửi mật mã qua Header để API xác thực
-    const response = await fetch("/api/ncr", {
-      headers: { "x-auth-key": sessionStorage.getItem("authKey") }
-    });
+    const response = await fetch("/api/ncr", { headers: { "x-auth-key": sessionStorage.getItem("authKey") } });
     const payload = await response.json();
-
-    if (!response.ok) throw new Error(payload.error || "Truy cập bị từ chối");
-
-    rawData = Array.isArray(payload.rows) ? payload.rows : [];
+    if (!response.ok) throw new Error(payload.error);
+    rawData = payload.rows || [];
     columns = detectColumns(rawData);
     populateFilters();
     renderDashboard();
-    setStatus(`${payload.rowCount.toLocaleString()} rows | ${payload.sheetName} | ${formatRefreshTime(payload.refreshedAt)}`);
-  } catch (error) {
-    console.error(error);
-    setStatus(error.message);
-    if (error.message.includes("401") || error.message.includes("từ chối")) {
-        sessionStorage.clear();
-        location.reload();
-    }
-  }
-}
-
-// ... Giữ toàn bộ các hàm xử lý dữ liệu và vẽ biểu đồ cũ của app.js ...
-// (Bao gồm detectColumns, populateFilters, getFilteredData, renderDashboard, buildCharts, v.v.)
-// Nhớ copy lại các hàm từ file app.js trước đó tôi gửi bạn vào đây.
-
-function detectColumns(rows) {
-  const headers = Object.keys(rows[0] || {});
-  return Object.fromEntries(Object.entries(columnAliases).map(([key, aliases]) => {
-      const found = headers.find(header => aliases.some(alias => normalizeText(header) === normalizeText(alias))) || 
-                    headers.find(header => aliases.some(alias => normalizeText(header).includes(normalizeText(alias))));
-      return [key, found || ""];
-  }));
-}
-
-function populateFilters() {
-  const supplierSelect = document.getElementById("supplierFilter");
-  const allSuppliers = distinct(rawData.map(row => normalizeSupplier(valueOf(row, columns.supplier))).filter(Boolean)).sort();
-  supplierSelect.innerHTML = `<option value="">All Suppliers</option>`;
-  const activeOpt = document.createElement("option");
-  activeOpt.value = "active_suppliers";
-  activeOpt.textContent = "⭐ Active Suppliers (Top 3)";
-  activeOpt.style.color = "#4ea1ff";
-  activeOpt.style.fontWeight = "bold";
-  supplierSelect.appendChild(activeOpt);
-  allSuppliers.forEach(value => {
-    const option = document.createElement("option");
-    option.value = value; option.textContent = value;
-    supplierSelect.appendChild(option);
-  });
-  fillSelect(document.getElementById("yearFilter"), "All Years", distinct(rawData.map(row => toYear(valueOf(row, columns.year))).filter(Boolean)).sort((a,b)=>a-b));
-}
-
-function fillSelect(select, allLabel, values) {
-  select.innerHTML = `<option value="">${allLabel}</option>`;
-  values.forEach(v => { const o = document.createElement("option"); o.value = v; o.textContent = v; select.appendChild(o); });
-}
-
-function resetFilters() {
-  selectedSupplier = ""; selectedYear = ""; selectedMonth = "";
-  document.getElementById("supplierFilter").value = "";
-  document.getElementById("yearFilter").value = "";
-  renderDashboard();
+    setStatus(`${payload.rowCount.toLocaleString()} dòng | ${payload.sheetName}`);
+  } catch (error) { setStatus(error.message); }
 }
 
 function getFilteredData() {
@@ -139,8 +71,18 @@ function getFilteredData() {
     const s = normalizeSupplier(valueOf(row, columns.supplier));
     const y = toYear(valueOf(row, columns.year));
     const m = toMonth(valueOf(row, columns.month));
+    const p = String(valueOf(row, columns.part) || "");
+    const ph = String(valueOf(row, columns.phenomenon) || "");
+    const st = String(valueOf(row, columns.replacement) || "");
+
     let matchS = !selectedSupplier ? true : (selectedSupplier === "active_suppliers" ? ACTIVE_SUPPLIERS.includes(s) : s === selectedSupplier);
-    return matchS && (!selectedYear || y === selectedYear) && (!selectedMonth || m === selectedMonth);
+    let matchY = !selectedYear || y === selectedYear;
+    let matchM = !selectedMonth || m === selectedMonth;
+    let matchPart = !selectedPart || p === selectedPart;
+    let matchPhen = !selectedPhenomenon || ph === selectedPhenomenon;
+    let matchStat = !selectedStatus || st === selectedStatus;
+
+    return matchS && matchY && matchM && matchPart && matchPhen && matchStat;
   });
 }
 
@@ -150,21 +92,47 @@ function renderDashboard() {
   buildCharts(data);
 }
 
-function updateKPI(data) {
-  setText("totalNcr", data.length.toLocaleString());
-  setText("totalQty", data.reduce((t, r) => t + toNumber(valueOf(r, columns.quantity)), 0).toLocaleString());
-  setText("totalSupplier", distinct(data.map(r => normalizeSupplier(valueOf(r, columns.supplier))).filter(Boolean)).length);
-  setText("totalPart", distinct(data.map(r => valueOf(r, columns.part)).filter(Boolean)).length);
-  setText("openNcr", data.filter(r => {
-    const st = normalizeText(valueOf(r, columns.status));
-    const cd = String(valueOf(r, columns.closeDate) || "").trim();
-    return st ? !["close", "closed", "complete", "done"].includes(st) : cd === "";
-  }).length.toLocaleString());
+function resetFilters() {
+  selectedSupplier = ""; selectedYear = ""; selectedMonth = "";
+  selectedPart = ""; selectedPhenomenon = ""; selectedStatus = "";
+  document.getElementById("supplierFilter").value = "";
+  document.getElementById("yearFilter").value = "";
+  renderDashboard();
 }
 
-function buildCharts(data) {
-  buildSupplierChart(data); buildYearChart(data); buildMonthChart(data);
-  buildStatusChart(data); buildPartChart(data); buildPhenomenonChart(data);
+// --- LOGIC VẼ BIỂU ĐỒ VỚI SỰ KIỆN CLICK ---
+
+function buildPartChart(data) {
+  partChart?.destroy();
+  const entries = groupCount(data, columns.part).sort((a,b)=>b.value-a.value).slice(0,10);
+  partChart = createBarChart("partChart", entries, "Top Parts", true, els => {
+    if(!els.length) return;
+    const val = entries[els[0].index].label;
+    selectedPart = (selectedPart === val) ? "" : val; // Bấm lần nữa để bỏ lọc
+    renderDashboard();
+  });
+}
+
+function buildPhenomenonChart(data) {
+  phenomenonChart?.destroy();
+  const entries = groupCount(data, columns.phenomenon).sort((a,b)=>b.value-a.value).slice(0,10);
+  phenomenonChart = createBarChart("phenomenonChart", entries, "Phenomenon", true, els => {
+    if(!els.length) return;
+    const val = entries[els[0].index].label;
+    selectedPhenomenon = (selectedPhenomenon === val) ? "" : val;
+    renderDashboard();
+  });
+}
+
+function buildStatusChart(data) {
+  statusChart?.destroy();
+  const entries = groupCount(data, columns.replacement).sort((a,b)=>b.value-a.value);
+  statusChart = createBarChart("statusChart", entries, "Replacement Status", false, els => {
+    if(!els.length) return;
+    const val = entries[els[0].index].label;
+    selectedStatus = (selectedStatus === val) ? "" : val;
+    renderDashboard();
+  });
 }
 
 function buildSupplierChart(data) {
@@ -194,23 +162,15 @@ function buildMonthChart(data) {
   const counts = Object.fromEntries(MONTHS.map(m => [m, 0]));
   data.forEach(r => { const m = toMonth(valueOf(r, columns.month)); if(m in counts) counts[m]++; });
   const entries = MONTHS.map(m => ({ label: m, value: counts[m] }));
-  monthChart = createBarChart("monthChart", entries, "NCR by Month");
+  monthChart = createBarChart("monthChart", entries, "NCR by Month", false, els => {
+    if(!els.length) return;
+    const val = MONTHS[els[0].index];
+    selectedMonth = (selectedMonth === val) ? "" : val;
+    renderDashboard();
+  });
 }
 
-function buildStatusChart(data) {
-  statusChart?.destroy();
-  statusChart = createBarChart("statusChart", groupCount(data, columns.replacement).sort((a,b)=>b.value-a.value), "Status");
-}
-
-function buildPartChart(data) {
-  partChart?.destroy();
-  partChart = createBarChart("partChart", groupCount(data, columns.part).sort((a,b)=>b.value-a.value).slice(0,10), "Top Parts", true);
-}
-
-function buildPhenomenonChart(data) {
-  phenomenonChart?.destroy();
-  phenomenonChart = createBarChart("phenomenonChart", groupCount(data, columns.phenomenon).sort((a,b)=>b.value-a.value).slice(0,10), "Phenomenon", true);
-}
+// --- CÁC HÀM HỖ TRỢ GIỮ NGUYÊN ---
 
 function createBarChart(id, entries, title, horizontal = false, onSelect = null) {
   return new Chart(document.getElementById(id), {
@@ -246,6 +206,49 @@ const valueLabelPlugin = {
     });
   }
 };
+
+function detectColumns(rows) {
+  const headers = Object.keys(rows[0] || {});
+  return Object.fromEntries(Object.entries(columnAliases).map(([key, aliases]) => {
+      const found = headers.find(header => aliases.some(alias => normalizeText(header) === normalizeText(alias))) || 
+                    headers.find(header => aliases.some(alias => normalizeText(header).includes(normalizeText(alias))));
+      return [key, found || ""];
+  }));
+}
+
+function populateFilters() {
+  const supplierSelect = document.getElementById("supplierFilter");
+  const allSuppliers = distinct(rawData.map(row => normalizeSupplier(valueOf(row, columns.supplier))).filter(Boolean)).sort();
+  supplierSelect.innerHTML = `<option value="">All Suppliers</option>`;
+  const activeOpt = document.createElement("option");
+  activeOpt.value = "active_suppliers";
+  activeOpt.textContent = "⭐ Active Suppliers (Top 3)";
+  activeOpt.style.color = "#4ea1ff"; activeOpt.style.fontWeight = "bold";
+  supplierSelect.appendChild(activeOpt);
+  allSuppliers.forEach(value => {
+    const option = document.createElement("option");
+    option.value = value; option.textContent = value;
+    supplierSelect.appendChild(option);
+  });
+  fillSelect(document.getElementById("yearFilter"), "All Years", distinct(rawData.map(row => toYear(valueOf(row, columns.year))).filter(Boolean)).sort((a,b)=>a-b));
+}
+
+function fillSelect(select, allLabel, values) {
+  select.innerHTML = `<option value="">${allLabel}</option>`;
+  values.forEach(v => { const o = document.createElement("option"); o.value = v; o.textContent = v; select.appendChild(o); });
+}
+
+function updateKPI(data) {
+  setText("totalNcr", data.length.toLocaleString());
+  setText("totalQty", data.reduce((t, r) => t + toNumber(valueOf(r, columns.quantity)), 0).toLocaleString());
+  setText("totalSupplier", distinct(data.map(r => normalizeSupplier(valueOf(r, columns.supplier))).filter(Boolean)).length);
+  setText("totalPart", distinct(data.map(r => valueOf(r, columns.part)).filter(Boolean)).length);
+  setText("openNcr", data.filter(r => {
+    const st = normalizeText(valueOf(r, columns.status));
+    const cd = String(valueOf(r, columns.closeDate) || "").trim();
+    return st ? !["close", "closed", "complete", "done"].includes(st) : cd === "";
+  }).length.toLocaleString());
+}
 
 function groupCount(data, col, trans = v => v) {
   if(!col) return [];
