@@ -10,17 +10,18 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 const chartColor = "#2589ff";
 const chartBorder = "#6fb7ff";
 
-// CẤU HÌNH CỘT: Đã ưu tiên "NCR Close date" theo đúng file của bạn
+// CẤU HÌNH CỘT: Map trực tiếp theo tiêu đề trong ảnh của bạn
 const columnAliases = {
-  supplier: ["Supplier", "Vendor", "Nhà cung cấp", "Supplier Name"],
-  year: ["NCR NCR Year", "NCR Year", "Year", "Năm"],
-  month: ["NCR Month", "Month", "Tháng"],
-  quantity: ["Quantity", "Qty", "Số lượng", "NCR Qty", "NCR QTY"], // Thêm NCR QTY viết hoa
-  part: ["Part", "Part Name", "Item", "Material", "Mã hàng"],
-  phenomenon: ["Phenomenon", "Defect", "Issue", "Lỗi", "Hiện tượng"],
-  replacement: ["Replacement Status", "Status", "Disposition", "Xử lý"],
-  closeDate: ["NCR Close date", "Close Date", "Ngày đóng"], // Cột L của bạn
-  status: ["NCR Status", "Status", "Trạng thái", "Notice", "Notice Status"]
+  supplier: ["Supplier"],
+  year: ["NCR NCR Year"],
+  month: ["NCR Month"],
+  quantity: ["Quantity", "Qty"],
+  part: ["Part"],
+  phenomenon: ["Phenomenon"],
+  replacement: ["Replacement Status", "Status"],
+  // Trong file của bạn, cột L vừa là Status vừa là Close Date
+  status: ["NCR Close date", "Status"], 
+  closeDate: ["NCR Close date"]
 };
 
 let columns = {};
@@ -51,7 +52,7 @@ function showDashboard() {
 }
 
 async function loadData() {
-  setStatus("Đang kết nối dữ liệu...");
+  setStatus("Đang tải dữ liệu...");
   try {
     const response = await fetch("/api/ncr", { headers: { "x-auth-key": sessionStorage.getItem("authKey") } });
     const payload = await response.json();
@@ -60,34 +61,17 @@ async function loadData() {
     columns = detectColumns(rawData);
     populateFilters();
     renderDashboard();
-    
-    // Kiểm tra xem có tìm thấy cột Close Date không
-    const closeColName = columns.closeDate || "KHÔNG TÌM THẤY";
-    setStatus(`${payload.rowCount} dòng | Cột ngày đóng: ${closeColName}`);
+    setStatus(`${payload.rowCount.toLocaleString()} dòng | Đã kết nối file Excel`);
   } catch (error) { setStatus(error.message); }
 }
 
-// LOGIC TÍNH OPEN NCR CẢI TIẾN
+// LOGIC TÍNH TOÁN OPEN NCR (Sửa lại cho file của bạn)
 function countOpenNcr(data) {
   return data.filter(row => {
-    const statusText = normalizeText(valueOf(row, columns.status));
-    const closeDateValue = valueOf(row, columns.closeDate);
-    const closeDateStr = String(closeDateValue || "").trim();
-
-    // 1. Nếu cột Status có chữ "Open" -> Chắc chắn là Open
-    if (statusText.includes("open")) return true;
-
-    // 2. Nếu cột Status có chữ "Close" -> Chắc chắn là Closed
-    if (statusText.includes("close")) return false;
-
-    // 3. QUAN TRỌNG: Nếu cột "NCR Close date" (Cột L) TRỐNG -> Tính là Open
-    // (Loại trừ trường hợp null, undefined, hoặc chuỗi rỗng)
-    if (!closeDateValue || closeDateStr === "" || closeDateStr.toLowerCase() === "null") {
-        return true; 
-    }
-
-    // 4. Nếu có bất kỳ dữ liệu gì trong cột ngày đóng -> Coi như đã Closed
-    return false;
+    // Lấy giá trị tại cột "NCR Close date" (Cột L)
+    const val = normalizeText(valueOf(row, columns.status) || valueOf(row, columns.closeDate));
+    // Nếu giá trị là "open" thì đếm là 1
+    return val === "open";
   }).length;
 }
 
@@ -117,16 +101,13 @@ function renderDashboard() {
 
 function updateKPI(data) {
   setText("totalNcr", data.length.toLocaleString());
-  // Sửa lỗi Total Qty: Nếu không tìm thấy cột Qty, mặc định sum sẽ là 0 hoặc sum của chính nó
-  const totalQty = data.reduce((t, r) => t + toNumber(valueOf(r, columns.quantity)), 0);
-  setText("totalQty", totalQty.toLocaleString());
-  
+  setText("totalQty", data.reduce((t, r) => t + toNumber(valueOf(r, columns.quantity)), 0).toLocaleString());
   setText("totalSupplier", distinct(data.map(r => normalizeSupplier(valueOf(r, columns.supplier))).filter(Boolean)).length);
   setText("totalPart", distinct(data.map(r => valueOf(r, columns.part)).filter(Boolean)).length);
+  // Cập nhật số lượng Open NCR
   setText("openNcr", countOpenNcr(data).toLocaleString());
 }
 
-// --- PHẦN BIỂU ĐỒ (Giữ nguyên logic Click để lọc) ---
 function buildCharts(data) {
   buildSupplierChart(data); buildYearChart(data); buildMonthChart(data);
   buildStatusChart(data); buildPartChart(data); buildPhenomenonChart(data);
@@ -234,7 +215,6 @@ const valueLabelPlugin = {
   }
 };
 
-// --- HÀM BỔ TRỢ ---
 function detectColumns(rows) {
   const headers = Object.keys(rows[0] || {});
   return Object.fromEntries(Object.entries(columnAliases).map(([key, aliases]) => {
