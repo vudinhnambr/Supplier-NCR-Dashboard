@@ -10,6 +10,9 @@ let selectedSupplier = "";
 let selectedYear = "";
 let selectedMonth = "";
 
+// Danh sách nhà cung cấp Active theo yêu cầu của bạn
+const ACTIVE_SUPPLIERS = ["WUXI PAIKE", "SINHOM", "TAESANG"];
+
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const chartColor = "#2589ff";
 const chartBorder = "#6fb7ff";
@@ -72,7 +75,6 @@ async function loadData() {
 
 function detectColumns(rows) {
   const headers = Object.keys(rows[0] || {});
-
   return Object.fromEntries(
     Object.entries(columnAliases).map(([key, aliases]) => {
       const found = headers.find(header =>
@@ -80,18 +82,33 @@ function detectColumns(rows) {
       ) || headers.find(header =>
         aliases.some(alias => normalizeText(header).includes(normalizeText(alias)))
       );
-
       return [key, found || ""];
     })
   );
 }
 
 function populateFilters() {
-  fillSelect(
-    document.getElementById("supplierFilter"),
-    "All Suppliers",
-    distinct(rawData.map(row => normalizeSupplier(valueOf(row, columns.supplier))).filter(Boolean))
-  );
+  const supplierSelect = document.getElementById("supplierFilter");
+  const allSuppliers = distinct(rawData.map(row => normalizeSupplier(valueOf(row, columns.supplier))).filter(Boolean)).sort();
+
+  // Reset và thêm Option mặc định
+  supplierSelect.innerHTML = `<option value="">All Suppliers</option>`;
+  
+  // THÊM OPTION ACTIVE SUPPLIERS
+  const activeOpt = document.createElement("option");
+  activeOpt.value = "active_suppliers";
+  activeOpt.textContent = "⭐ Active Suppliers (Top 3)";
+  activeOpt.style.color = "#4ea1ff";
+  activeOpt.style.fontWeight = "bold";
+  supplierSelect.appendChild(activeOpt);
+
+  // Thêm các nhà cung cấp cụ thể
+  allSuppliers.forEach(value => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = value;
+    supplierSelect.appendChild(option);
+  });
 
   fillSelect(
     document.getElementById("yearFilter"),
@@ -102,7 +119,6 @@ function populateFilters() {
 
 function fillSelect(select, allLabel, values) {
   select.innerHTML = `<option value="">${escapeHtml(allLabel)}</option>`;
-
   values.forEach(value => {
     const option = document.createElement("option");
     option.value = value;
@@ -126,7 +142,17 @@ function getFilteredData() {
     const year = toYear(valueOf(row, columns.year));
     const month = toMonth(valueOf(row, columns.month));
 
-    return (!selectedSupplier || supplier === selectedSupplier)
+    // LOGIC LỌC ACTIVE SUPPLIERS
+    let matchSupplier = false;
+    if (!selectedSupplier) {
+      matchSupplier = true;
+    } else if (selectedSupplier === "active_suppliers") {
+      matchSupplier = ACTIVE_SUPPLIERS.includes(supplier);
+    } else {
+      matchSupplier = (supplier === selectedSupplier);
+    }
+
+    return matchSupplier
       && (!selectedYear || year === selectedYear)
       && (!selectedMonth || month === selectedMonth);
   });
@@ -134,7 +160,6 @@ function getFilteredData() {
 
 function renderDashboard() {
   const data = getFilteredData();
-
   updateKPI(data);
   buildCharts(data);
 }
@@ -158,14 +183,12 @@ function buildCharts(data) {
 
 function buildSupplierChart(data) {
   supplierChart?.destroy();
-
   const entries = groupCount(data, columns.supplier, value => normalizeSupplier(value))
     .sort((a, b) => b.value - a.value)
     .slice(0, 12);
 
   supplierChart = createBarChart("supplierChart", entries, "Supplier NCR", false, elements => {
     if (!elements.length) return;
-
     selectedSupplier = entries[elements[0].index].label;
     document.getElementById("supplierFilter").value = selectedSupplier;
     renderDashboard();
@@ -174,16 +197,13 @@ function buildSupplierChart(data) {
 
 function buildYearChart(data) {
   yearChart?.destroy();
-
   const entries = groupCount(data, columns.year, toYear)
     .sort((a, b) => Number(a.label) - Number(b.label));
 
   yearChart = createBarChart("yearChart", entries, "NCR by Year", false, elements => {
     if (!elements.length) return;
-
     const year = entries[elements[0].index].label;
     selectedYear = selectedYear === year ? "" : year;
-
     document.getElementById("yearFilter").value = selectedYear;
     renderDashboard();
   });
@@ -191,19 +211,14 @@ function buildYearChart(data) {
 
 function buildMonthChart(data) {
   monthChart?.destroy();
-
   const counts = Object.fromEntries(MONTHS.map(month => [month, 0]));
-
   data.forEach(row => {
     const month = toMonth(valueOf(row, columns.month));
     if (month in counts) counts[month] += 1;
   });
-
   const entries = MONTHS.map(month => ({ label: month, value: counts[month] }));
-
   monthChart = createBarChart("monthChart", entries, "NCR by Month", false, elements => {
     if (!elements.length) return;
-
     const month = MONTHS[elements[0].index];
     selectedMonth = selectedMonth === month ? "" : month;
     renderDashboard();
@@ -212,30 +227,24 @@ function buildMonthChart(data) {
 
 function buildStatusChart(data) {
   statusChart?.destroy();
-
   const entries = groupCount(data, columns.replacement)
     .sort((a, b) => b.value - a.value);
-
   statusChart = createBarChart("statusChart", entries, "Replacement Status");
 }
 
 function buildPartChart(data) {
   partChart?.destroy();
-
   const entries = groupCount(data, columns.part)
     .sort((a, b) => b.value - a.value)
     .slice(0, 10);
-
   partChart = createBarChart("partChart", entries, "Top Parts", true);
 }
 
 function buildPhenomenonChart(data) {
   phenomenonChart?.destroy();
-
   const entries = groupCount(data, columns.phenomenon)
     .sort((a, b) => b.value - a.value)
     .slice(0, 10);
-
   phenomenonChart = createBarChart("phenomenonChart", entries, "Phenomenon", true);
 }
 
@@ -293,53 +302,38 @@ const valueLabelPlugin = {
     const { ctx } = chart;
     const meta = chart.getDatasetMeta(0);
     const horizontal = chart.options.indexAxis === "y";
-
     ctx.save();
     ctx.fillStyle = "#d7e5ff";
     ctx.font = "12px Segoe UI, Arial, sans-serif";
     ctx.textAlign = horizontal ? "left" : "center";
     ctx.textBaseline = "middle";
-
     meta.data.forEach((bar, index) => {
       const value = chart.data.datasets[0].data[index];
       if (!value) return;
-
-      if (horizontal) {
-        ctx.fillText(value, bar.x + 6, bar.y);
-      } else {
-        ctx.fillText(value, bar.x, bar.y - 10);
-      }
+      if (horizontal) { ctx.fillText(value, bar.x + 6, bar.y); } 
+      else { ctx.fillText(value, bar.x, bar.y - 10); }
     });
-
     ctx.restore();
   }
 };
 
 function groupCount(data, column, transform = value => value) {
   if (!column) return [];
-
   const counts = new Map();
-
   data.forEach(row => {
     const label = transform(valueOf(row, column)) || "Unknown";
     counts.set(label, (counts.get(label) || 0) + 1);
   });
-
-  return [...counts.entries()].map(([label, value]) => ({
-    label: String(label),
-    value
-  }));
+  return [...counts.entries()].map(([label, value]) => ({ label: String(label), value }));
 }
 
 function countOpenNcr(data) {
   return data.filter(row => {
     const explicitStatus = normalizeText(valueOf(row, columns.status));
     const closeDate = String(valueOf(row, columns.closeDate) || "").trim();
-
     if (explicitStatus) {
       return !["close", "closed", "complete", "completed", "done"].includes(explicitStatus);
     }
-
     return closeDate === "";
   }).length;
 }
@@ -348,9 +342,7 @@ function sumQuantity(data) {
   return data.reduce((total, row) => total + toNumber(valueOf(row, columns.quantity)), 0);
 }
 
-function valueOf(row, column) {
-  return column ? row[column] : "";
-}
+function valueOf(row, column) { return column ? row[column] : ""; }
 
 function toYear(value) {
   const text = String(value || "").trim();
@@ -361,11 +353,7 @@ function toYear(value) {
 function toMonth(value) {
   const text = String(value || "").trim();
   const number = Number(text);
-
-  if (number >= 1 && number <= 12) {
-    return MONTHS[number - 1];
-  }
-
+  if (number >= 1 && number <= 12) return MONTHS[number - 1];
   const normalized = normalizeText(text);
   return MONTHS.find(month => normalized.startsWith(month.toLowerCase())) || "";
 }
@@ -375,49 +363,25 @@ function toNumber(value) {
   return Number.isFinite(number) ? number : 0;
 }
 
-function normalizeSupplier(value) {
-  return String(value || "").trim().toUpperCase();
-}
+function normalizeSupplier(value) { return String(value || "").trim().toUpperCase(); }
 
 function normalizeText(value) {
-  return String(value || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  return String(value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
 }
 
-function distinct(values) {
-  return [...new Set(values.map(value => String(value).trim()).filter(Boolean))];
-}
+function distinct(values) { return [...new Set(values.map(value => String(value).trim()).filter(Boolean))]; }
 
 function escapeHtml(value) {
-  return String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+  return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-function setText(id, value) {
-  document.getElementById(id).textContent = value;
-}
+function setText(id, value) { document.getElementById(id).textContent = value; }
 
-function setStatus(message) {
-  document.getElementById("dataStatus").textContent = message;
-}
+function setStatus(message) { document.getElementById("dataStatus").textContent = message; }
 
 function formatRefreshTime(value) {
   if (!value) return "";
-
   return new Date(value).toLocaleString("en-US", {
-    hour12: false,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit"
+    hour12: false, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit"
   });
 }
