@@ -10,16 +10,17 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 const chartColor = "#2589ff";
 const chartBorder = "#6fb7ff";
 
+// CẤU HÌNH CỘT: Đã ưu tiên "NCR Close date" theo đúng file của bạn
 const columnAliases = {
-  supplier: ["Supplier", "Vendor", "Nhà cung cấp"],
-  year: ["NCR NCR Year", "NCR Year", "Year"],
-  month: ["NCR Month", "Month"],
-  quantity: ["Quantity", "Qty"],
-  part: ["Part", "Part Name", "Item"],
-  phenomenon: ["Phenomenon", "Defect", "Lỗi"],
-  replacement: ["Replacement Status", "Status"],
-  closeDate: ["NCR Close date", "Close Date"],
-  status: ["NCR Status", "Status"]
+  supplier: ["Supplier", "Vendor", "Nhà cung cấp", "Supplier Name"],
+  year: ["NCR NCR Year", "NCR Year", "Year", "Năm"],
+  month: ["NCR Month", "Month", "Tháng"],
+  quantity: ["Quantity", "Qty", "Số lượng", "NCR Qty", "NCR QTY"], // Thêm NCR QTY viết hoa
+  part: ["Part", "Part Name", "Item", "Material", "Mã hàng"],
+  phenomenon: ["Phenomenon", "Defect", "Issue", "Lỗi", "Hiện tượng"],
+  replacement: ["Replacement Status", "Status", "Disposition", "Xử lý"],
+  closeDate: ["NCR Close date", "Close Date", "Ngày đóng"], // Cột L của bạn
+  status: ["NCR Status", "Status", "Trạng thái", "Notice", "Notice Status"]
 };
 
 let columns = {};
@@ -27,20 +28,10 @@ let columns = {};
 document.addEventListener("DOMContentLoaded", () => {
   const loginBtn = document.getElementById("loginBtn");
   if (sessionStorage.getItem("isLoggedIn") === "true") showDashboard();
-  
   loginBtn.addEventListener("click", checkLogin);
-  document.getElementById("passInput").addEventListener("keydown", (e) => { 
-    if (e.key === "Enter") checkLogin(); 
-  });
-
-  document.getElementById("supplierFilter").addEventListener("change", e => { 
-    selectedSupplier = e.target.value; renderDashboard(); 
-  });
-  
-  document.getElementById("yearFilter").addEventListener("change", e => { 
-    selectedYear = e.target.value; renderDashboard(); 
-  });
-
+  document.getElementById("passInput").addEventListener("keydown", (e) => { if (e.key === "Enter") checkLogin(); });
+  document.getElementById("supplierFilter").addEventListener("change", e => { selectedSupplier = e.target.value; renderDashboard(); });
+  document.getElementById("yearFilter").addEventListener("change", e => { selectedYear = e.target.value; renderDashboard(); });
   document.getElementById("resetButton").addEventListener("click", resetFilters);
 });
 
@@ -50,9 +41,7 @@ function checkLogin() {
     sessionStorage.setItem("isLoggedIn", "true");
     sessionStorage.setItem("authKey", input);
     showDashboard();
-  } else {
-    document.getElementById("loginError").style.display = "block";
-  }
+  } else { document.getElementById("loginError").style.display = "block"; }
 }
 
 function showDashboard() {
@@ -62,41 +51,43 @@ function showDashboard() {
 }
 
 async function loadData() {
-  setStatus("Đang tải dữ liệu...");
+  setStatus("Đang kết nối dữ liệu...");
   try {
-    const response = await fetch("/api/ncr", { 
-      headers: { "x-auth-key": sessionStorage.getItem("authKey") } 
-    });
+    const response = await fetch("/api/ncr", { headers: { "x-auth-key": sessionStorage.getItem("authKey") } });
     const payload = await response.json();
-    if (!response.ok) throw new Error(payload.error || "Lỗi tải dữ liệu");
-
+    if (!response.ok) throw new Error(payload.error);
     rawData = payload.rows || [];
     columns = detectColumns(rawData);
     populateFilters();
     renderDashboard();
-    setStatus(`${payload.rowCount.toLocaleString()} dòng | ${payload.sheetName}`);
-  } catch (error) {
-    setStatus(error.message);
-  }
+    
+    // Kiểm tra xem có tìm thấy cột Close Date không
+    const closeColName = columns.closeDate || "KHÔNG TÌM THẤY";
+    setStatus(`${payload.rowCount} dòng | Cột ngày đóng: ${closeColName}`);
+  } catch (error) { setStatus(error.message); }
 }
 
-// LOGIC TÍNH TOÁN OPEN NCR MỚI
+// LOGIC TÍNH OPEN NCR CẢI TIẾN
 function countOpenNcr(data) {
   return data.filter(row => {
     const statusText = normalizeText(valueOf(row, columns.status));
-    const closeDate = String(valueOf(row, columns.closeDate) || "").trim();
+    const closeDateValue = valueOf(row, columns.closeDate);
+    const closeDateStr = String(closeDateValue || "").trim();
 
-    // CHỈ TÍNH LÀ OPEN KHI CÓ CHỮ "OPEN"
-    if (statusText.includes("open")) {
-      return true;
+    // 1. Nếu cột Status có chữ "Open" -> Chắc chắn là Open
+    if (statusText.includes("open")) return true;
+
+    // 2. Nếu cột Status có chữ "Close" -> Chắc chắn là Closed
+    if (statusText.includes("close")) return false;
+
+    // 3. QUAN TRỌNG: Nếu cột "NCR Close date" (Cột L) TRỐNG -> Tính là Open
+    // (Loại trừ trường hợp null, undefined, hoặc chuỗi rỗng)
+    if (!closeDateValue || closeDateStr === "" || closeDateStr.toLowerCase() === "null") {
+        return true; 
     }
 
-    // NẾU CÓ CHỮ "CLOSE" HOẶC CÓ NGÀY ĐÓNG THÌ LÀ CLOSED (KHÔNG PHẢI OPEN)
-    if (statusText.includes("close") || closeDate !== "") {
-      return false;
-    }
-
-    return false; // Mặc định các trường hợp khác là không Open
+    // 4. Nếu có bất kỳ dữ liệu gì trong cột ngày đóng -> Coi như đã Closed
+    return false;
   }).length;
 }
 
@@ -108,14 +99,12 @@ function getFilteredData() {
     const p = String(valueOf(row, columns.part) || "");
     const ph = String(valueOf(row, columns.phenomenon) || "");
     const st = String(valueOf(row, columns.replacement) || "");
-
     let matchS = !selectedSupplier ? true : (selectedSupplier === "active_suppliers" ? ACTIVE_SUPPLIERS.includes(s) : s === selectedSupplier);
     let matchY = !selectedYear || y === selectedYear;
     let matchM = !selectedMonth || m === selectedMonth;
     let matchPart = !selectedPart || p === selectedPart;
     let matchPhen = !selectedPhenomenon || ph === selectedPhenomenon;
     let matchStat = !selectedStatus || st === selectedStatus;
-
     return matchS && matchY && matchM && matchPart && matchPhen && matchStat;
   });
 }
@@ -126,36 +115,27 @@ function renderDashboard() {
   buildCharts(data);
 }
 
-function resetFilters() {
-  selectedSupplier = ""; selectedYear = ""; selectedMonth = "";
-  selectedPart = ""; selectedPhenomenon = ""; selectedStatus = "";
-  document.getElementById("supplierFilter").value = "";
-  document.getElementById("yearFilter").value = "";
-  renderDashboard();
-}
-
 function updateKPI(data) {
   setText("totalNcr", data.length.toLocaleString());
-  setText("totalQty", data.reduce((t, r) => t + toNumber(valueOf(r, columns.quantity)), 0).toLocaleString());
+  // Sửa lỗi Total Qty: Nếu không tìm thấy cột Qty, mặc định sum sẽ là 0 hoặc sum của chính nó
+  const totalQty = data.reduce((t, r) => t + toNumber(valueOf(r, columns.quantity)), 0);
+  setText("totalQty", totalQty.toLocaleString());
+  
   setText("totalSupplier", distinct(data.map(r => normalizeSupplier(valueOf(r, columns.supplier))).filter(Boolean)).length);
   setText("totalPart", distinct(data.map(r => valueOf(r, columns.part)).filter(Boolean)).length);
-  setText("openNcr", countOpenNcr(data).toLocaleString()); // Gọi hàm tính Open mới
+  setText("openNcr", countOpenNcr(data).toLocaleString());
 }
 
-// --- BIỂU ĐỒ ---
+// --- PHẦN BIỂU ĐỒ (Giữ nguyên logic Click để lọc) ---
 function buildCharts(data) {
-  buildSupplierChart(data);
-  buildYearChart(data);
-  buildMonthChart(data);
-  buildStatusChart(data);
-  buildPartChart(data);
-  buildPhenomenonChart(data);
+  buildSupplierChart(data); buildYearChart(data); buildMonthChart(data);
+  buildStatusChart(data); buildPartChart(data); buildPhenomenonChart(data);
 }
 
 function buildSupplierChart(data) {
   supplierChart?.destroy();
   const entries = groupCount(data, columns.supplier, v => normalizeSupplier(v)).sort((a,b)=>b.value-a.value).slice(0,12);
-  supplierChart = createBarChart("supplierChart", entries, "Supplier NCR", false, els => {
+  supplierChart = createBarChart("supplierChart", entries, "Supplier", false, els => {
     if(!els.length) return;
     selectedSupplier = entries[els[0].index].label;
     document.getElementById("supplierFilter").value = selectedSupplier;
@@ -166,7 +146,7 @@ function buildSupplierChart(data) {
 function buildYearChart(data) {
   yearChart?.destroy();
   const entries = groupCount(data, columns.year, toYear).sort((a,b)=>a.label-b.label);
-  yearChart = createBarChart("yearChart", entries, "NCR by Year", false, els => {
+  yearChart = createBarChart("yearChart", entries, "Year", false, els => {
     if(!els.length) return;
     selectedYear = entries[els[0].index].label;
     document.getElementById("yearFilter").value = selectedYear;
@@ -178,8 +158,7 @@ function buildMonthChart(data) {
   monthChart?.destroy();
   const counts = Object.fromEntries(MONTHS.map(m => [m, 0]));
   data.forEach(r => { const m = toMonth(valueOf(r, columns.month)); if(m in counts) counts[m]++; });
-  const entries = MONTHS.map(m => ({ label: m, value: counts[m] }));
-  monthChart = createBarChart("monthChart", entries, "NCR by Month", false, els => {
+  monthChart = createBarChart("monthChart", MONTHS.map(m => ({ label: m, value: counts[m] })), "Month", false, els => {
     if(!els.length) return;
     const val = MONTHS[els[0].index];
     selectedMonth = (selectedMonth === val) ? "" : val;
@@ -225,7 +204,7 @@ function createBarChart(id, entries, title, horizontal = false, onSelect = null)
     type: "bar",
     data: {
       labels: entries.map(e => e.label),
-      datasets: [{ label: title, data: entries.map(e => e.value), backgroundColor: chartColor, borderColor: chartBorder, borderWidth: 1, borderRadius: 2, maxBarThickness: 48 }]
+      datasets: [{ label: title, data: entries.map(e => e.value), backgroundColor: chartColor, borderColor: chartBorder, borderWidth: 1, borderRadius: 2 }]
     },
     options: {
       responsive: true, maintainAspectRatio: false, indexAxis: horizontal ? "y" : "x",
@@ -255,6 +234,7 @@ const valueLabelPlugin = {
   }
 };
 
+// --- HÀM BỔ TRỢ ---
 function detectColumns(rows) {
   const headers = Object.keys(rows[0] || {});
   return Object.fromEntries(Object.entries(columnAliases).map(([key, aliases]) => {
@@ -284,6 +264,14 @@ function fillSelect(select, allLabel, values) {
   values.forEach(v => { const o = document.createElement("option"); o.value = v; o.textContent = v; select.appendChild(o); });
 }
 
+function resetFilters() {
+  selectedSupplier = ""; selectedYear = ""; selectedMonth = "";
+  selectedPart = ""; selectedPhenomenon = ""; selectedStatus = "";
+  document.getElementById("supplierFilter").value = "";
+  document.getElementById("yearFilter").value = "";
+  renderDashboard();
+}
+
 function groupCount(data, col, trans = v => v) {
   if(!col) return [];
   const counts = new Map();
@@ -297,9 +285,15 @@ function toMonth(v) {
     const n = Number(v); if(n >= 1 && n <= 12) return MONTHS[n-1];
     return MONTHS.find(m => normalizeText(v).startsWith(m.toLowerCase())) || "";
 }
-function toNumber(v) { const n = Number(String(v||"").replace(/,/g, "")); return isFinite(n) ? n : 0; }
+function toNumber(v) { 
+    if(!v) return 0;
+    const n = Number(String(v).replace(/,/g, "")); 
+    return isFinite(n) ? n : 0; 
+}
 function normalizeSupplier(v) { return String(v||"").trim().toUpperCase(); }
-function normalizeText(v) { return String(v||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim(); }
+function normalizeText(v) { 
+    return String(v||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim(); 
+}
 function distinct(vals) { return [...new Set(vals.map(v => String(v).trim()).filter(Boolean))]; }
 function setText(id, v) { document.getElementById(id).textContent = v; }
 function setStatus(m) { document.getElementById("dataStatus").textContent = m; }
