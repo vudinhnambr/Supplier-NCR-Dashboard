@@ -1,7 +1,6 @@
 let rawData = [];
 let supplierChart, yearChart, monthChart, statusChart, partChart, phenomenonChart;
 
-// Trạng thái lọc
 let selectedSupplier = "", selectedYear = "", selectedMonth = "";
 let selectedPart = "", selectedPhenomenon = "", selectedStatus = "";
 
@@ -26,13 +25,22 @@ const columnAliases = {
 let columns = {};
 
 document.addEventListener("DOMContentLoaded", () => {
+  const loginBtn = document.getElementById("loginBtn");
   if (sessionStorage.getItem("isLoggedIn") === "true") showDashboard();
   
-  document.getElementById("loginBtn").addEventListener("click", checkLogin);
-  document.getElementById("passInput").addEventListener("keydown", (e) => { if (e.key === "Enter") checkLogin(); });
+  loginBtn.addEventListener("click", checkLogin);
+  document.getElementById("passInput").addEventListener("keydown", (e) => { 
+    if (e.key === "Enter") checkLogin(); 
+  });
 
-  document.getElementById("supplierFilter").addEventListener("change", e => { selectedSupplier = e.target.value; renderDashboard(); });
-  document.getElementById("yearFilter").addEventListener("change", e => { selectedYear = e.target.value; renderDashboard(); });
+  document.getElementById("supplierFilter").addEventListener("change", e => { 
+    selectedSupplier = e.target.value; renderDashboard(); 
+  });
+  
+  document.getElementById("yearFilter").addEventListener("change", e => { 
+    selectedYear = e.target.value; renderDashboard(); 
+  });
+
   document.getElementById("resetButton").addEventListener("click", resetFilters);
 });
 
@@ -56,15 +64,40 @@ function showDashboard() {
 async function loadData() {
   setStatus("Đang tải dữ liệu...");
   try {
-    const response = await fetch("/api/ncr", { headers: { "x-auth-key": sessionStorage.getItem("authKey") } });
+    const response = await fetch("/api/ncr", { 
+      headers: { "x-auth-key": sessionStorage.getItem("authKey") } 
+    });
     const payload = await response.json();
-    if (!response.ok) throw new Error(payload.error);
+    if (!response.ok) throw new Error(payload.error || "Lỗi tải dữ liệu");
+
     rawData = payload.rows || [];
     columns = detectColumns(rawData);
     populateFilters();
     renderDashboard();
     setStatus(`${payload.rowCount.toLocaleString()} dòng | ${payload.sheetName}`);
-  } catch (error) { setStatus(error.message); }
+  } catch (error) {
+    setStatus(error.message);
+  }
+}
+
+// LOGIC TÍNH TOÁN OPEN NCR MỚI
+function countOpenNcr(data) {
+  return data.filter(row => {
+    const statusText = normalizeText(valueOf(row, columns.status));
+    const closeDate = String(valueOf(row, columns.closeDate) || "").trim();
+
+    // CHỈ TÍNH LÀ OPEN KHI CÓ CHỮ "OPEN"
+    if (statusText.includes("open")) {
+      return true;
+    }
+
+    // NẾU CÓ CHỮ "CLOSE" HOẶC CÓ NGÀY ĐÓNG THÌ LÀ CLOSED (KHÔNG PHẢI OPEN)
+    if (statusText.includes("close") || closeDate !== "") {
+      return false;
+    }
+
+    return false; // Mặc định các trường hợp khác là không Open
+  }).length;
 }
 
 function getFilteredData() {
@@ -93,23 +126,23 @@ function renderDashboard() {
   buildCharts(data);
 }
 
+function resetFilters() {
+  selectedSupplier = ""; selectedYear = ""; selectedMonth = "";
+  selectedPart = ""; selectedPhenomenon = ""; selectedStatus = "";
+  document.getElementById("supplierFilter").value = "";
+  document.getElementById("yearFilter").value = "";
+  renderDashboard();
+}
+
 function updateKPI(data) {
   setText("totalNcr", data.length.toLocaleString());
   setText("totalQty", data.reduce((t, r) => t + toNumber(valueOf(r, columns.quantity)), 0).toLocaleString());
   setText("totalSupplier", distinct(data.map(r => normalizeSupplier(valueOf(r, columns.supplier))).filter(Boolean)).length);
   setText("totalPart", distinct(data.map(r => valueOf(r, columns.part)).filter(Boolean)).length);
-  
-  const openCount = data.filter(r => {
-    const st = normalizeText(valueOf(r, columns.status));
-    const cd = String(valueOf(r, columns.closeDate) || "").trim();
-    const closedKeywords = ["close", "closed", "complete", "completed", "done", "ok", "finish"];
-    if (st && closedKeywords.some(k => st.includes(k))) return false;
-    if (cd !== "" && cd !== "null" && cd !== "undefined") return false;
-    return true;
-  }).length;
-  setText("openNcr", openCount.toLocaleString());
+  setText("openNcr", countOpenNcr(data).toLocaleString()); // Gọi hàm tính Open mới
 }
 
+// --- BIỂU ĐỒ ---
 function buildCharts(data) {
   buildSupplierChart(data);
   buildYearChart(data);
@@ -192,15 +225,15 @@ function createBarChart(id, entries, title, horizontal = false, onSelect = null)
     type: "bar",
     data: {
       labels: entries.map(e => e.label),
-      datasets: [{ label: title, data: entries.map(e => e.value), backgroundColor: chartColor, borderColor: chartBorder, borderWidth: 1, borderRadius: 2, maxBarThickness: 40 }]
+      datasets: [{ label: title, data: entries.map(e => e.value), backgroundColor: chartColor, borderColor: chartBorder, borderWidth: 1, borderRadius: 2, maxBarThickness: 48 }]
     },
     options: {
       responsive: true, maintainAspectRatio: false, indexAxis: horizontal ? "y" : "x",
       onClick: (e, els) => onSelect?.(els),
       plugins: { legend: { display: false } },
       scales: { 
-          x: { ticks: { color: "#d7e5ff", font: { size: 11 } }, grid: { color: "rgba(255,255,255,.05)" } },
-          y: { beginAtZero: true, ticks: { color: "#d7e5ff", font: { size: 11 } }, grid: { color: "rgba(255,255,255,.08)" } } 
+          x: { ticks: { color: "#d7e5ff" }, grid: { color: "rgba(255,255,255,.05)" } },
+          y: { ticks: { color: "#d7e5ff" }, grid: { color: "rgba(255,255,255,.08)" } } 
       }
     },
     plugins: [valueLabelPlugin]
@@ -213,8 +246,8 @@ const valueLabelPlugin = {
     const { ctx } = chart;
     chart.getDatasetMeta(0).data.forEach((bar, i) => {
       const v = chart.data.datasets[0].data[i];
-      if (v === undefined || v === null) return;
-      ctx.save(); ctx.fillStyle = "#d7e5ff"; ctx.font = "11px Arial";
+      if (v === undefined) return;
+      ctx.save(); ctx.fillStyle = "#d7e5ff"; ctx.font = "12px Arial";
       ctx.textAlign = chart.options.indexAxis === 'y' ? 'left' : 'center';
       ctx.fillText(v, chart.options.indexAxis === 'y' ? bar.x + 5 : bar.x, chart.options.indexAxis === 'y' ? bar.y : bar.y - 10);
       ctx.restore();
@@ -225,8 +258,8 @@ const valueLabelPlugin = {
 function detectColumns(rows) {
   const headers = Object.keys(rows[0] || {});
   return Object.fromEntries(Object.entries(columnAliases).map(([key, aliases]) => {
-      const found = headers.find(header => aliases.some(alias => normalizeText(header) === normalizeText(alias))) || 
-                    headers.find(header => aliases.some(alias => normalizeText(header).includes(normalizeText(alias))));
+      const found = headers.find(h => aliases.some(a => normalizeText(h) === normalizeText(a))) || 
+                    headers.find(h => aliases.some(a => normalizeText(h).includes(normalizeText(a))));
       return [key, found || ""];
   }));
 }
@@ -240,10 +273,8 @@ function populateFilters() {
   activeOpt.textContent = "⭐ Active Suppliers (Top 3)";
   activeOpt.style.color = "#4ea1ff"; activeOpt.style.fontWeight = "bold";
   supplierSelect.appendChild(activeOpt);
-  allSuppliers.forEach(value => {
-    const option = document.createElement("option");
-    option.value = value; option.textContent = value;
-    supplierSelect.appendChild(option);
+  allSuppliers.forEach(v => {
+    const o = document.createElement("option"); o.value = v; o.textContent = v; supplierSelect.appendChild(o);
   });
   fillSelect(document.getElementById("yearFilter"), "All Years", distinct(rawData.map(row => toYear(valueOf(row, columns.year))).filter(Boolean)).sort((a,b)=>a-b));
 }
@@ -253,20 +284,13 @@ function fillSelect(select, allLabel, values) {
   values.forEach(v => { const o = document.createElement("option"); o.value = v; o.textContent = v; select.appendChild(o); });
 }
 
-function resetFilters() {
-  selectedSupplier = ""; selectedYear = ""; selectedMonth = "";
-  selectedPart = ""; selectedPhenomenon = ""; selectedStatus = "";
-  document.getElementById("supplierFilter").value = "";
-  document.getElementById("yearFilter").value = "";
-  renderDashboard();
-}
-
 function groupCount(data, col, trans = v => v) {
   if(!col) return [];
   const counts = new Map();
   data.forEach(r => { const l = trans(valueOf(r, col)) || "Unknown"; counts.set(l, (counts.get(l) || 0) + 1); });
   return [...counts.entries()].map(([label, value]) => ({ label: String(label), value }));
 }
+
 function valueOf(row, col) { return col ? row[col] : ""; }
 function toYear(v) { const m = String(v||"").match(/\b(20\d{2})\b/); return m ? m[1] : ""; }
 function toMonth(v) { 
