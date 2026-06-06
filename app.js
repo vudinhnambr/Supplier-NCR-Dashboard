@@ -18,8 +18,8 @@ const columnAliases = {
   part: ["Part", "Part Name"],
   phenomenon: ["Phenomenon", "Defect"],
   replacement: ["Replacement Status", "Status"],
-  closeDate: ["NCR Close date", "Close Date"],
-  status: ["NCR Status", "Status", "NCR Close date"]
+  closeDate: ["NCR Close date", "Close Date"], // Cột L của bạn
+  status: ["NCR Status", "Status"]
 };
 
 let columns = {};
@@ -59,19 +59,38 @@ async function loadData() {
     columns = detectColumns(rawData);
     populateFilters();
     renderDashboard();
-    setStatus(`${payload.rowCount.toLocaleString()} dòng | Dữ liệu đã sẵn sàng`);
+    setStatus(`${payload.rowCount.toLocaleString()} dòng | Cập nhật: ${formatRefreshTime(payload.refreshedAt)}`);
   } catch (error) { setStatus(error.message); }
 }
 
-// --- LOGIC ĐẾM OPEN NCR "BẤT CHẤP" TÊN CỘT ---
+// --- LOGIC ĐẾM OPEN NCR CHUẨN THEO FILE EXCEL CỦA BẠN ---
 function countOpenNcr(data) {
   return data.filter(row => {
-    // Quét tất cả các giá trị trong hàng (row)
-    // Nếu có bất kỳ ô nào chứa chữ "Open" (không phân biệt hoa thường)
-    return Object.values(row).some(val => {
-      const text = String(val || "").trim().toLowerCase();
-      return text === "open"; // Khớp chính xác chữ "open"
-    });
+    const val = valueOf(row, columns.closeDate);
+    
+    // 1. Nếu ô TRỐNG (Blanks) -> Tính là OPEN
+    if (val === undefined || val === null || String(val).trim() === "") {
+      return true;
+    }
+
+    const text = String(val).toLowerCase().trim();
+
+    // 2. Nếu chứa chữ "open" hoặc "waiting" (đang chờ duyệt) -> Tính là OPEN
+    if (text.includes("open") || text.includes("waiting")) {
+      return true;
+    }
+
+    // 3. Nếu chứa chữ "close" -> Tính là CLOSED (Không đếm)
+    if (text.includes("close")) {
+      return false;
+    }
+
+    // 4. Nếu là định dạng NGÀY THÁNG hoặc SỐ NĂM (Ví dụ: 2025, 2026) -> Tính là CLOSED (Không đếm)
+    if (val instanceof Date) return false;
+    if (!isNaN(val) && Number(val) > 1900) return false;
+
+    // Mặc định nếu không rơi vào các trường hợp Close bên trên thì coi như vẫn Open
+    return true;
   }).length;
 }
 
@@ -83,12 +102,14 @@ function getFilteredData() {
     const p = String(valueOf(row, columns.part) || "");
     const ph = String(valueOf(row, columns.phenomenon) || "");
     const st = String(valueOf(row, columns.replacement) || "");
+
     let matchS = !selectedSupplier ? true : (selectedSupplier === "active_suppliers" ? ACTIVE_SUPPLIERS.includes(s) : s === selectedSupplier);
     let matchY = !selectedYear || y === selectedYear;
     let matchM = !selectedMonth || m === selectedMonth;
     let matchPart = !selectedPart || p === selectedPart;
     let matchPhen = !selectedPhenomenon || ph === selectedPhenomenon;
     let matchStat = !selectedStatus || st === selectedStatus;
+
     return matchS && matchY && matchM && matchPart && matchPhen && matchStat;
   });
 }
@@ -104,11 +125,18 @@ function updateKPI(data) {
   setText("totalQty", data.reduce((t, r) => t + toNumber(valueOf(r, columns.quantity)), 0).toLocaleString());
   setText("totalSupplier", distinct(data.map(r => normalizeSupplier(valueOf(r, columns.supplier))).filter(Boolean)).length);
   setText("totalPart", distinct(data.map(r => valueOf(r, columns.part)).filter(Boolean)).length);
-  // Gọi hàm đếm Open NCR mới
   setText("openNcr", countOpenNcr(data).toLocaleString());
 }
 
-// --- PHẦN BIỂU ĐỒ ---
+function resetFilters() {
+  selectedSupplier = ""; selectedYear = ""; selectedMonth = "";
+  selectedPart = ""; selectedPhenomenon = ""; selectedStatus = "";
+  document.getElementById("supplierFilter").value = "";
+  document.getElementById("yearFilter").value = "";
+  renderDashboard();
+}
+
+// --- BIỂU ĐỒ ---
 function buildCharts(data) {
   buildSupplierChart(data); buildYearChart(data); buildMonthChart(data);
   buildStatusChart(data); buildPartChart(data); buildPhenomenonChart(data);
@@ -243,14 +271,6 @@ function populateFilters() {
 function fillSelect(select, allLabel, values) {
   select.innerHTML = `<option value="">${allLabel}</option>`;
   values.forEach(v => { const o = document.createElement("option"); o.value = v; o.textContent = v; select.appendChild(o); });
-}
-
-function resetFilters() {
-  selectedSupplier = ""; selectedYear = ""; selectedMonth = "";
-  selectedPart = ""; selectedPhenomenon = ""; selectedStatus = "";
-  document.getElementById("supplierFilter").value = "";
-  document.getElementById("yearFilter").value = "";
-  renderDashboard();
 }
 
 function groupCount(data, col, trans = v => v) {
