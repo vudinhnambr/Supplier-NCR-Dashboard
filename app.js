@@ -1,37 +1,40 @@
 let rawData = [];
-let supplierChart;
-let yearChart;
-let monthChart;
-let statusChart;
-let partChart;
-let phenomenonChart;
+let supplierChart, yearChart, monthChart, statusChart, partChart, phenomenonChart;
+let selectedSupplier = "", selectedYear = "", selectedMonth = "";
 
-let selectedSupplier = "";
-let selectedYear = "";
-let selectedMonth = "";
-
-// Danh sách nhà cung cấp Active theo yêu cầu của bạn
 const ACTIVE_SUPPLIERS = ["WUXI PAIKE", "SINHOM", "TAESANG"];
+const MASTER_PASSWORD = "CSBearing"; // Mật mã bạn yêu cầu
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const chartColor = "#2589ff";
 const chartBorder = "#6fb7ff";
 
 const columnAliases = {
-  supplier: ["Supplier", "Vendor", "Nhà cung cấp", "Nha cung cap"],
-  year: ["NCR NCR Year", "NCR Year", "Year", "Năm", "Nam"],
-  month: ["NCR Month", "Month", "Tháng", "Thang"],
-  quantity: ["Quantity", "Qty", "Số lượng", "So luong"],
-  part: ["Part", "Part Name", "Item", "Material", "Mã hàng", "Ma hang"],
-  phenomenon: ["Phenomenon", "Defect", "Issue", "Lỗi", "Loi", "Hiện tượng", "Hien tuong"],
-  replacement: ["Replacement Status", "Status", "Disposition"],
-  closeDate: ["NCR Close date", "NCR Close Date", "Close Date", "Closed Date"],
-  status: ["NCR Status", "Status", "Close Status", "Current status", "Notice Status"]
+  supplier: ["Supplier", "Vendor", "Nhà cung cấp"],
+  year: ["NCR NCR Year", "NCR Year", "Year"],
+  month: ["NCR Month", "Month"],
+  quantity: ["Quantity", "Qty"],
+  part: ["Part", "Part Name", "Item"],
+  phenomenon: ["Phenomenon", "Defect", "Lỗi"],
+  replacement: ["Replacement Status", "Status"],
+  closeDate: ["NCR Close date", "Close Date"],
+  status: ["NCR Status", "Status"]
 };
 
 let columns = {};
 
 document.addEventListener("DOMContentLoaded", () => {
+  const loginBtn = document.getElementById("loginBtn");
+  const passInput = document.getElementById("passInput");
+
+  // Kiểm tra nếu đã đăng nhập trước đó (trong cùng một session)
+  if (sessionStorage.getItem("isLoggedIn") === "true") {
+    showDashboard();
+  }
+
+  loginBtn.addEventListener("click", checkLogin);
+  passInput.addEventListener("keydown", (e) => { if (e.key === "Enter") checkLogin(); });
+
   document.getElementById("supplierFilter").addEventListener("change", event => {
     selectedSupplier = event.target.value;
     renderDashboard();
@@ -43,94 +46,89 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   document.getElementById("resetButton").addEventListener("click", resetFilters);
-
-  loadData();
 });
 
-async function loadData() {
-  setStatus("Loading Google Drive Excel data...");
-
-  try {
-    const response = await fetch("/api/ncr");
-    const payload = await response.json();
-
-    if (!response.ok) {
-      throw new Error(payload.error || `API returned ${response.status}`);
-    }
-
-    rawData = Array.isArray(payload.rows) ? payload.rows : [];
-    columns = detectColumns(rawData);
-
-    populateFilters();
-    renderDashboard();
-
-    setStatus(`${payload.rowCount.toLocaleString("en-US")} rows | ${payload.sheetName} | ${formatRefreshTime(payload.refreshedAt)}`);
-  } catch (error) {
-    console.error(error);
-    setStatus(error.message);
-    rawData = [];
-    renderDashboard();
+function checkLogin() {
+  const input = document.getElementById("passInput").value;
+  if (input === MASTER_PASSWORD) {
+    sessionStorage.setItem("isLoggedIn", "true");
+    sessionStorage.setItem("authKey", input); // Lưu để gửi lên API
+    showDashboard();
+  } else {
+    document.getElementById("loginError").style.display = "block";
   }
 }
 
+function showDashboard() {
+  document.getElementById("loginGate").style.display = "none";
+  document.getElementById("mainDashboard").style.display = "flex";
+  loadData();
+}
+
+async function loadData() {
+  setStatus("Loading Google Drive Excel data...");
+  try {
+    // Gửi mật mã qua Header để API xác thực
+    const response = await fetch("/api/ncr", {
+      headers: { "x-auth-key": sessionStorage.getItem("authKey") }
+    });
+    const payload = await response.json();
+
+    if (!response.ok) throw new Error(payload.error || "Truy cập bị từ chối");
+
+    rawData = Array.isArray(payload.rows) ? payload.rows : [];
+    columns = detectColumns(rawData);
+    populateFilters();
+    renderDashboard();
+    setStatus(`${payload.rowCount.toLocaleString()} rows | ${payload.sheetName} | ${formatRefreshTime(payload.refreshedAt)}`);
+  } catch (error) {
+    console.error(error);
+    setStatus(error.message);
+    if (error.message.includes("401") || error.message.includes("từ chối")) {
+        sessionStorage.clear();
+        location.reload();
+    }
+  }
+}
+
+// ... Giữ toàn bộ các hàm xử lý dữ liệu và vẽ biểu đồ cũ của app.js ...
+// (Bao gồm detectColumns, populateFilters, getFilteredData, renderDashboard, buildCharts, v.v.)
+// Nhớ copy lại các hàm từ file app.js trước đó tôi gửi bạn vào đây.
+
 function detectColumns(rows) {
   const headers = Object.keys(rows[0] || {});
-  return Object.fromEntries(
-    Object.entries(columnAliases).map(([key, aliases]) => {
-      const found = headers.find(header =>
-        aliases.some(alias => normalizeText(header) === normalizeText(alias))
-      ) || headers.find(header =>
-        aliases.some(alias => normalizeText(header).includes(normalizeText(alias)))
-      );
+  return Object.fromEntries(Object.entries(columnAliases).map(([key, aliases]) => {
+      const found = headers.find(header => aliases.some(alias => normalizeText(header) === normalizeText(alias))) || 
+                    headers.find(header => aliases.some(alias => normalizeText(header).includes(normalizeText(alias))));
       return [key, found || ""];
-    })
-  );
+  }));
 }
 
 function populateFilters() {
   const supplierSelect = document.getElementById("supplierFilter");
   const allSuppliers = distinct(rawData.map(row => normalizeSupplier(valueOf(row, columns.supplier))).filter(Boolean)).sort();
-
-  // Reset và thêm Option mặc định
   supplierSelect.innerHTML = `<option value="">All Suppliers</option>`;
-  
-  // THÊM OPTION ACTIVE SUPPLIERS
   const activeOpt = document.createElement("option");
   activeOpt.value = "active_suppliers";
   activeOpt.textContent = "⭐ Active Suppliers (Top 3)";
   activeOpt.style.color = "#4ea1ff";
   activeOpt.style.fontWeight = "bold";
   supplierSelect.appendChild(activeOpt);
-
-  // Thêm các nhà cung cấp cụ thể
   allSuppliers.forEach(value => {
     const option = document.createElement("option");
-    option.value = value;
-    option.textContent = value;
+    option.value = value; option.textContent = value;
     supplierSelect.appendChild(option);
   });
-
-  fillSelect(
-    document.getElementById("yearFilter"),
-    "All Years",
-    distinct(rawData.map(row => toYear(valueOf(row, columns.year))).filter(Boolean)).sort((a, b) => Number(a) - Number(b))
-  );
+  fillSelect(document.getElementById("yearFilter"), "All Years", distinct(rawData.map(row => toYear(valueOf(row, columns.year))).filter(Boolean)).sort((a,b)=>a-b));
 }
 
 function fillSelect(select, allLabel, values) {
-  select.innerHTML = `<option value="">${escapeHtml(allLabel)}</option>`;
-  values.forEach(value => {
-    const option = document.createElement("option");
-    option.value = value;
-    option.textContent = value;
-    select.appendChild(option);
-  });
+  select.innerHTML = `<option value="">${allLabel}</option>`;
+  values.forEach(v => { const o = document.createElement("option"); o.value = v; o.textContent = v; select.appendChild(o); });
 }
 
 function resetFilters() {
-  selectedSupplier = "";
-  selectedYear = "";
-  selectedMonth = "";
+  selectedSupplier = ""; selectedYear = ""; selectedMonth = "";
   document.getElementById("supplierFilter").value = "";
   document.getElementById("yearFilter").value = "";
   renderDashboard();
@@ -138,23 +136,11 @@ function resetFilters() {
 
 function getFilteredData() {
   return rawData.filter(row => {
-    const supplier = normalizeSupplier(valueOf(row, columns.supplier));
-    const year = toYear(valueOf(row, columns.year));
-    const month = toMonth(valueOf(row, columns.month));
-
-    // LOGIC LỌC ACTIVE SUPPLIERS
-    let matchSupplier = false;
-    if (!selectedSupplier) {
-      matchSupplier = true;
-    } else if (selectedSupplier === "active_suppliers") {
-      matchSupplier = ACTIVE_SUPPLIERS.includes(supplier);
-    } else {
-      matchSupplier = (supplier === selectedSupplier);
-    }
-
-    return matchSupplier
-      && (!selectedYear || year === selectedYear)
-      && (!selectedMonth || month === selectedMonth);
+    const s = normalizeSupplier(valueOf(row, columns.supplier));
+    const y = toYear(valueOf(row, columns.year));
+    const m = toMonth(valueOf(row, columns.month));
+    let matchS = !selectedSupplier ? true : (selectedSupplier === "active_suppliers" ? ACTIVE_SUPPLIERS.includes(s) : s === selectedSupplier);
+    return matchS && (!selectedYear || y === selectedYear) && (!selectedMonth || m === selectedMonth);
   });
 }
 
@@ -165,31 +151,28 @@ function renderDashboard() {
 }
 
 function updateKPI(data) {
-  setText("totalNcr", data.length.toLocaleString("en-US"));
-  setText("totalQty", sumQuantity(data).toLocaleString("en-US"));
-  setText("totalSupplier", distinct(data.map(row => normalizeSupplier(valueOf(row, columns.supplier))).filter(Boolean)).length);
-  setText("totalPart", distinct(data.map(row => valueOf(row, columns.part)).filter(Boolean)).length);
-  setText("openNcr", countOpenNcr(data).toLocaleString("en-US"));
+  setText("totalNcr", data.length.toLocaleString());
+  setText("totalQty", data.reduce((t, r) => t + toNumber(valueOf(r, columns.quantity)), 0).toLocaleString());
+  setText("totalSupplier", distinct(data.map(r => normalizeSupplier(valueOf(r, columns.supplier))).filter(Boolean)).length);
+  setText("totalPart", distinct(data.map(r => valueOf(r, columns.part)).filter(Boolean)).length);
+  setText("openNcr", data.filter(r => {
+    const st = normalizeText(valueOf(r, columns.status));
+    const cd = String(valueOf(r, columns.closeDate) || "").trim();
+    return st ? !["close", "closed", "complete", "done"].includes(st) : cd === "";
+  }).length.toLocaleString());
 }
 
 function buildCharts(data) {
-  buildSupplierChart(data);
-  buildYearChart(data);
-  buildMonthChart(data);
-  buildStatusChart(data);
-  buildPartChart(data);
-  buildPhenomenonChart(data);
+  buildSupplierChart(data); buildYearChart(data); buildMonthChart(data);
+  buildStatusChart(data); buildPartChart(data); buildPhenomenonChart(data);
 }
 
 function buildSupplierChart(data) {
   supplierChart?.destroy();
-  const entries = groupCount(data, columns.supplier, value => normalizeSupplier(value))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 12);
-
-  supplierChart = createBarChart("supplierChart", entries, "Supplier NCR", false, elements => {
-    if (!elements.length) return;
-    selectedSupplier = entries[elements[0].index].label;
+  const entries = groupCount(data, columns.supplier, v => normalizeSupplier(v)).sort((a,b)=>b.value-a.value).slice(0,12);
+  supplierChart = createBarChart("supplierChart", entries, "Supplier NCR", false, els => {
+    if(!els.length) return;
+    selectedSupplier = entries[els[0].index].label;
     document.getElementById("supplierFilter").value = selectedSupplier;
     renderDashboard();
   });
@@ -197,13 +180,10 @@ function buildSupplierChart(data) {
 
 function buildYearChart(data) {
   yearChart?.destroy();
-  const entries = groupCount(data, columns.year, toYear)
-    .sort((a, b) => Number(a.label) - Number(b.label));
-
-  yearChart = createBarChart("yearChart", entries, "NCR by Year", false, elements => {
-    if (!elements.length) return;
-    const year = entries[elements[0].index].label;
-    selectedYear = selectedYear === year ? "" : year;
+  const entries = groupCount(data, columns.year, toYear).sort((a,b)=>a.label-b.label);
+  yearChart = createBarChart("yearChart", entries, "NCR by Year", false, els => {
+    if(!els.length) return;
+    selectedYear = entries[els[0].index].label;
     document.getElementById("yearFilter").value = selectedYear;
     renderDashboard();
   });
@@ -211,85 +191,41 @@ function buildYearChart(data) {
 
 function buildMonthChart(data) {
   monthChart?.destroy();
-  const counts = Object.fromEntries(MONTHS.map(month => [month, 0]));
-  data.forEach(row => {
-    const month = toMonth(valueOf(row, columns.month));
-    if (month in counts) counts[month] += 1;
-  });
-  const entries = MONTHS.map(month => ({ label: month, value: counts[month] }));
-  monthChart = createBarChart("monthChart", entries, "NCR by Month", false, elements => {
-    if (!elements.length) return;
-    const month = MONTHS[elements[0].index];
-    selectedMonth = selectedMonth === month ? "" : month;
-    renderDashboard();
-  });
+  const counts = Object.fromEntries(MONTHS.map(m => [m, 0]));
+  data.forEach(r => { const m = toMonth(valueOf(r, columns.month)); if(m in counts) counts[m]++; });
+  const entries = MONTHS.map(m => ({ label: m, value: counts[m] }));
+  monthChart = createBarChart("monthChart", entries, "NCR by Month");
 }
 
 function buildStatusChart(data) {
   statusChart?.destroy();
-  const entries = groupCount(data, columns.replacement)
-    .sort((a, b) => b.value - a.value);
-  statusChart = createBarChart("statusChart", entries, "Replacement Status");
+  statusChart = createBarChart("statusChart", groupCount(data, columns.replacement).sort((a,b)=>b.value-a.value), "Status");
 }
 
 function buildPartChart(data) {
   partChart?.destroy();
-  const entries = groupCount(data, columns.part)
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 10);
-  partChart = createBarChart("partChart", entries, "Top Parts", true);
+  partChart = createBarChart("partChart", groupCount(data, columns.part).sort((a,b)=>b.value-a.value).slice(0,10), "Top Parts", true);
 }
 
 function buildPhenomenonChart(data) {
   phenomenonChart?.destroy();
-  const entries = groupCount(data, columns.phenomenon)
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 10);
-  phenomenonChart = createBarChart("phenomenonChart", entries, "Phenomenon", true);
+  phenomenonChart = createBarChart("phenomenonChart", groupCount(data, columns.phenomenon).sort((a,b)=>b.value-a.value).slice(0,10), "Phenomenon", true);
 }
 
-function createBarChart(canvasId, entries, title, horizontal = false, onSelect = null) {
-  const labels = entries.map(entry => entry.label);
-  const values = entries.map(entry => entry.value);
-
-  return new Chart(document.getElementById(canvasId), {
+function createBarChart(id, entries, title, horizontal = false, onSelect = null) {
+  return new Chart(document.getElementById(id), {
     type: "bar",
     data: {
-      labels,
-      datasets: [{
-        label: title,
-        data: values,
-        backgroundColor: chartColor,
-        borderColor: chartBorder,
-        borderWidth: 1,
-        borderRadius: 2,
-        maxBarThickness: 48
-      }]
+      labels: entries.map(e => e.label),
+      datasets: [{ label: title, data: entries.map(e => e.value), backgroundColor: chartColor, borderColor: chartBorder, borderWidth: 1, borderRadius: 2, maxBarThickness: 48 }]
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      indexAxis: horizontal ? "y" : "x",
-      onClick: (_event, elements) => onSelect?.(elements),
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: item => `Total NCR: ${item.raw}`
-          }
-        }
-      },
-      scales: {
-        x: {
-          beginAtZero: horizontal,
-          ticks: { color: "#d7e5ff", autoSkip: false, maxRotation: horizontal ? 0 : 45 },
-          grid: { color: "rgba(255,255,255,.05)" }
-        },
-        y: {
-          beginAtZero: true,
-          ticks: { color: "#d7e5ff", precision: 0 },
-          grid: { color: "rgba(255,255,255,.08)" }
-        }
+      responsive: true, maintainAspectRatio: false, indexAxis: horizontal ? "y" : "x",
+      onClick: (e, els) => onSelect?.(els),
+      plugins: { legend: { display: false } },
+      scales: { 
+          x: { ticks: { color: "#d7e5ff" }, grid: { color: "rgba(255,255,255,.05)" } },
+          y: { ticks: { color: "#d7e5ff" }, grid: { color: "rgba(255,255,255,.08)" } } 
       }
     },
     plugins: [valueLabelPlugin]
@@ -300,88 +236,33 @@ const valueLabelPlugin = {
   id: "valueLabel",
   afterDatasetsDraw(chart) {
     const { ctx } = chart;
-    const meta = chart.getDatasetMeta(0);
-    const horizontal = chart.options.indexAxis === "y";
-    ctx.save();
-    ctx.fillStyle = "#d7e5ff";
-    ctx.font = "12px Segoe UI, Arial, sans-serif";
-    ctx.textAlign = horizontal ? "left" : "center";
-    ctx.textBaseline = "middle";
-    meta.data.forEach((bar, index) => {
-      const value = chart.data.datasets[0].data[index];
-      if (!value) return;
-      if (horizontal) { ctx.fillText(value, bar.x + 6, bar.y); } 
-      else { ctx.fillText(value, bar.x, bar.y - 10); }
+    chart.getDatasetMeta(0).data.forEach((bar, i) => {
+      const v = chart.data.datasets[0].data[i];
+      if (!v) return;
+      ctx.save(); ctx.fillStyle = "#d7e5ff"; ctx.font = "12px Arial";
+      ctx.textAlign = chart.options.indexAxis === 'y' ? 'left' : 'center';
+      ctx.fillText(v, chart.options.indexAxis === 'y' ? bar.x + 5 : bar.x, chart.options.indexAxis === 'y' ? bar.y : bar.y - 10);
+      ctx.restore();
     });
-    ctx.restore();
   }
 };
 
-function groupCount(data, column, transform = value => value) {
-  if (!column) return [];
+function groupCount(data, col, trans = v => v) {
+  if(!col) return [];
   const counts = new Map();
-  data.forEach(row => {
-    const label = transform(valueOf(row, column)) || "Unknown";
-    counts.set(label, (counts.get(label) || 0) + 1);
-  });
+  data.forEach(r => { const l = trans(valueOf(r, col)) || "Unknown"; counts.set(l, (counts.get(l) || 0) + 1); });
   return [...counts.entries()].map(([label, value]) => ({ label: String(label), value }));
 }
-
-function countOpenNcr(data) {
-  return data.filter(row => {
-    const explicitStatus = normalizeText(valueOf(row, columns.status));
-    const closeDate = String(valueOf(row, columns.closeDate) || "").trim();
-    if (explicitStatus) {
-      return !["close", "closed", "complete", "completed", "done"].includes(explicitStatus);
-    }
-    return closeDate === "";
-  }).length;
+function valueOf(row, col) { return col ? row[col] : ""; }
+function toYear(v) { const m = String(v||"").match(/\b(20\d{2})\b/); return m ? m[1] : ""; }
+function toMonth(v) { 
+    const n = Number(v); if(n >= 1 && n <= 12) return MONTHS[n-1];
+    return MONTHS.find(m => normalizeText(v).startsWith(m.toLowerCase())) || "";
 }
-
-function sumQuantity(data) {
-  return data.reduce((total, row) => total + toNumber(valueOf(row, columns.quantity)), 0);
-}
-
-function valueOf(row, column) { return column ? row[column] : ""; }
-
-function toYear(value) {
-  const text = String(value || "").trim();
-  const match = text.match(/\b(19\d{2}|20\d{2})\b/);
-  return match ? match[1] : "";
-}
-
-function toMonth(value) {
-  const text = String(value || "").trim();
-  const number = Number(text);
-  if (number >= 1 && number <= 12) return MONTHS[number - 1];
-  const normalized = normalizeText(text);
-  return MONTHS.find(month => normalized.startsWith(month.toLowerCase())) || "";
-}
-
-function toNumber(value) {
-  const number = Number(String(value || "").replace(/,/g, ""));
-  return Number.isFinite(number) ? number : 0;
-}
-
-function normalizeSupplier(value) { return String(value || "").trim().toUpperCase(); }
-
-function normalizeText(value) {
-  return String(value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
-}
-
-function distinct(values) { return [...new Set(values.map(value => String(value).trim()).filter(Boolean))]; }
-
-function escapeHtml(value) {
-  return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-
-function setText(id, value) { document.getElementById(id).textContent = value; }
-
-function setStatus(message) { document.getElementById("dataStatus").textContent = message; }
-
-function formatRefreshTime(value) {
-  if (!value) return "";
-  return new Date(value).toLocaleString("en-US", {
-    hour12: false, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit"
-  });
-}
+function toNumber(v) { const n = Number(String(v||"").replace(/,/g, "")); return isFinite(n) ? n : 0; }
+function normalizeSupplier(v) { return String(v||"").trim().toUpperCase(); }
+function normalizeText(v) { return String(v||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim(); }
+function distinct(vals) { return [...new Set(vals.map(v => String(v).trim()).filter(Boolean))]; }
+function setText(id, v) { document.getElementById(id).textContent = v; }
+function setStatus(m) { document.getElementById("dataStatus").textContent = m; }
+function formatRefreshTime(v) { return v ? new Date(v).toLocaleString() : ""; }
