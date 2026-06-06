@@ -7,7 +7,6 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: "Mật mã không đúng." });
   }
 
-  // Lấy link và xóa bỏ mọi khoảng trắng thừa ở hai đầu
   let sourceUrl = process.env.NCR_XLSX_URL ? process.env.NCR_XLSX_URL.trim() : null;
   
   if (!sourceUrl) {
@@ -17,13 +16,14 @@ export default async function handler(req, res) {
   try {
     const fileId = extractId(sourceUrl);
     if (!fileId) {
-      return res.status(400).json({ error: "Link Google Drive không đúng định dạng." });
+      return res.status(400).json({ error: "Không tìm thấy ID trong Link Google Drive." });
     }
 
-    // Sử dụng link download trực tiếp chuẩn nhất
-    const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+    // TẠO LINK TẢI CHO GOOGLE SHEETS (Dùng export?format=xlsx)
+    // Đây là cách tốt nhất cho link bạn vừa gửi
+    const downloadUrl = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=xlsx`;
     
-    console.log("Đang tải từ ID:", fileId); // Log để kiểm tra trong Vercel Logs
+    console.log("Đang tải dữ liệu từ ID:", fileId);
 
     const response = await axios.get(downloadUrl, {
       responseType: "arraybuffer",
@@ -45,18 +45,15 @@ export default async function handler(req, res) {
       rows
     });
   } catch (error) {
-    // Nếu lỗi 404, giải thích rõ hơn cho người dùng
     const status = error.response ? error.response.status : "Unknown";
-    const msg = (status === 404) 
-      ? "Lỗi 404: Google không tìm thấy file. Hãy kiểm tra lại link trong Vercel (xem có thừa ký tự nào không)."
-      : error.message;
-
-    return res.status(500).json({ error: `Không thể đọc file: ${msg}` });
+    return res.status(500).json({ 
+      error: `Lỗi ${status}: Không thể đọc file. Hãy đảm bảo file đã được Share 'Bất kỳ ai có liên kết'.` 
+    });
   }
 }
 
 function extractId(url) {
-  // Regex này mạnh hơn để bắt đúng ID giữa các dấu gạch chéo
+  // Bóc tách ID từ cả link drive.google.com và docs.google.com
   const match = url.match(/\/d\/([^/]+)/) || url.match(/[?&]id=([^&]+)/);
   return match ? match[1] : null;
 }
