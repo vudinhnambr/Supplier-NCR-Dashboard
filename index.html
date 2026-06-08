@@ -6,6 +6,8 @@
     <title>Supplier NCR Dashboard</title>
     <link rel="stylesheet" href="styles.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="app.js" defer></script>
   </head>
   <body>
@@ -41,6 +43,7 @@
         </div>
 
         <button id="resetButton" class="reset-btn" type="button">Reset All Filters</button>
+        <button id="exportPdfBtn" class="export-btn" type="button">⬇ Export PDF</button>
 
         <div class="source-box">
           <span>Google Drive Excel</span>
@@ -53,6 +56,18 @@
           <h1>SUPPLIER PERFORMANCE</h1>
           <span>NCR Analytics Dashboard</span>
         </header>
+
+        <!-- Hidden PDF render area -->
+        <div id="pdfContent" style="display:none; position:absolute; left:-9999px; top:0; width:1122px; background:#020b24; color:#fff; padding:30px; font-family:'Segoe UI',Arial,sans-serif;">
+          <div id="pdfHeader" style="margin-bottom:20px;">
+            <div style="font-size:32px;font-weight:900;color:#4ea1ff;">NCR</div>
+            <div style="font-size:18px;font-weight:600;margin-top:4px;">SUPPLIER PERFORMANCE — NCR Analytics Report</div>
+            <div id="pdfMeta" style="font-size:12px;color:#9fb5dd;margin-top:4px;"></div>
+          </div>
+          <div id="pdfKpi" style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px;"></div>
+          <div id="pdfCharts" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;"></div>
+          <div id="pdfTable"></div>
+        </div>
 
         <section class="kpi-grid">
           <div class="kpi-card"><h4>Total NCR</h4><span id="totalNcr">0</span></div>

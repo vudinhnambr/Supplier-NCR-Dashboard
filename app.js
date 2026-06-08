@@ -33,6 +33,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("supplierFilter").addEventListener("change", e => { selectedSupplier = e.target.value; renderDashboard(); });
   document.getElementById("yearFilter").addEventListener("change", e => { selectedYear = e.target.value; renderDashboard(); });
   document.getElementById("resetButton").addEventListener("click", resetFilters);
+  document.getElementById("exportPdfBtn").addEventListener("click", exportPDF);
 });
 
 function checkLogin() {
@@ -300,3 +301,178 @@ function distinct(vals) { return [...new Set(vals.map(v => String(v).trim()).fil
 function setText(id, v) { document.getElementById(id).textContent = v; }
 function setStatus(m) { document.getElementById("dataStatus").textContent = m; }
 function formatRefreshTime(v) { return v ? new Date(v).toLocaleString() : ""; }
+
+// ===================== EXPORT PDF =====================
+async function exportPDF() {
+  const btn = document.getElementById("exportPdfBtn");
+  btn.textContent = "⏳ Đang xuất...";
+  btn.disabled = true;
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const data = getFilteredData();
+    const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    const W = 297, H = 210, margin = 10;
+    let y = margin;
+
+    // --- Helpers ---
+    const blue = [78, 161, 255];
+    const dark = [2, 11, 36];
+    const muted = [159, 181, 221];
+    const white = [255, 255, 255];
+    const panelBg = [7, 22, 48];
+
+    function setFont(size, style = "normal", color = white) {
+      pdf.setFontSize(size); pdf.setFont("helvetica", style); pdf.setTextColor(...color);
+    }
+
+    // --- Background ---
+    pdf.setFillColor(...dark);
+    pdf.rect(0, 0, W, H, "F");
+
+    // --- Header ---
+    setFont(22, "bold", blue);
+    pdf.text("NCR", margin, y + 8);
+    setFont(13, "bold", white);
+    pdf.text("SUPPLIER PERFORMANCE — NCR Analytics Report", margin + 20, y + 8);
+    setFont(9, "normal", muted);
+    const filterLabel = [
+      selectedSupplier ? `Supplier: ${selectedSupplier}` : "Supplier: All",
+      selectedYear ? `Year: ${selectedYear}` : "Year: All",
+      selectedMonth ? `Month: ${selectedMonth}` : ""
+    ].filter(Boolean).join("  |  ");
+    pdf.text(`${filterLabel}   |   Exported: ${new Date().toLocaleString()}`, margin, y + 15);
+    y += 22;
+
+    // --- KPI Cards ---
+    const kpis = [
+      { label: "Total NCR", val: document.getElementById("totalNcr").textContent },
+      { label: "Total Qty", val: document.getElementById("totalQty").textContent },
+      { label: "Suppliers", val: document.getElementById("totalSupplier").textContent },
+      { label: "Parts", val: document.getElementById("totalPart").textContent },
+      { label: "Open NCR", val: document.getElementById("openNcr").textContent },
+    ];
+    const cardW = (W - margin * 2 - 8) / 5;
+    kpis.forEach((k, i) => {
+      const x = margin + i * (cardW + 2);
+      pdf.setFillColor(...panelBg); pdf.setDrawColor(36, 70, 120);
+      pdf.roundedRect(x, y, cardW, 20, 2, 2, "FD");
+      setFont(8, "normal", muted); pdf.text(k.label, x + 4, y + 7);
+      setFont(14, "bold", white); pdf.text(k.val, x + 4, y + 17);
+    });
+    y += 26;
+
+    // --- Charts (capture canvas) ---
+    const chartIds = ["supplierChart", "yearChart", "monthChart", "partChart", "phenomenonChart", "statusChart"];
+    const chartTitles = ["Supplier NCR Ranking", "NCR by Year", "NCR by Month", "Top Parts", "Phenomenon", "Replacement Status"];
+    const fullCharts = [0, 5]; // index của full-width charts
+    const chartH = 52, chartW2 = (W - margin * 2 - 4) / 2, chartWfull = W - margin * 2;
+    let cx = margin, cy = y;
+
+    for (let i = 0; i < chartIds.length; i++) {
+      const canvas = document.getElementById(chartIds[i]);
+      if (!canvas) continue;
+      const isFull = fullCharts.includes(i);
+      const cw = isFull ? chartWfull : chartW2;
+
+      // Panel bg
+      pdf.setFillColor(...panelBg); pdf.setDrawColor(36, 70, 120);
+      pdf.roundedRect(cx, cy, cw, chartH + 8, 2, 2, "FD");
+
+      // Title
+      setFont(8, "bold", blue);
+      pdf.text(chartTitles[i], cx + 4, cy + 6);
+
+      // Chart image
+      const imgData = canvas.toDataURL("image/png");
+      pdf.addImage(imgData, "PNG", cx + 2, cy + 8, cw - 4, chartH - 2);
+
+      if (isFull) {
+        cx = margin; cy += chartH + 12;
+      } else if (i % 2 === 0 && !fullCharts.includes(i)) {
+        cx = margin + chartW2 + 4;
+      } else {
+        cx = margin; cy += chartH + 12;
+      }
+
+      // New page if needed
+      if (cy + chartH + 12 > H - 10 && i < chartIds.length - 1) {
+        pdf.addPage();
+        pdf.setFillColor(...dark); pdf.rect(0, 0, W, H, "F");
+        cy = margin; cx = margin;
+      }
+    }
+
+    // --- Data Table (new page) ---
+    pdf.addPage();
+    pdf.setFillColor(...dark); pdf.rect(0, 0, W, H, "F");
+    y = margin;
+
+    setFont(12, "bold", blue);
+    pdf.text("NCR Detail List", margin, y + 6);
+    setFont(8, "normal", muted);
+    pdf.text(`Total: ${data.length} records`, margin, y + 12);
+    y += 18;
+
+    const colDefs = [
+      { key: columns.ncrNo,      label: "NCR No.",    w: 38 },
+      { key: columns.supplier,   label: "Supplier",   w: 28 },
+      { key: columns.part,       label: "Part",       w: 36 },
+      { key: columns.year,       label: "Year",       w: 14 },
+      { key: columns.month,      label: "Month",      w: 14 },
+      { key: columns.quantity,   label: "Qty",        w: 12 },
+      { key: columns.phenomenon, label: "Phenomenon", w: 44 },
+      { key: columns.replacement,label: "Status",     w: 38 },
+      { key: columns.closeDate,  label: "Close Date", w: 30 },
+    ];
+    const rowH = 7, headerH = 9;
+    const totalW = colDefs.reduce((s, c) => s + c.w, 0);
+
+    // Table header
+    pdf.setFillColor(37, 115, 255); pdf.setDrawColor(...panelBg);
+    pdf.rect(margin, y, totalW, headerH, "F");
+    setFont(7.5, "bold", white);
+    let tx = margin;
+    colDefs.forEach(c => {
+      pdf.text(c.label, tx + 2, y + 6); tx += c.w;
+    });
+    y += headerH;
+
+    // Rows
+    data.forEach((row, ri) => {
+      if (y + rowH > H - 8) {
+        pdf.addPage();
+        pdf.setFillColor(...dark); pdf.rect(0, 0, W, H, "F");
+        y = margin;
+        // Repeat header
+        pdf.setFillColor(37, 115, 255);
+        pdf.rect(margin, y, totalW, headerH, "F");
+        setFont(7.5, "bold", white);
+        let hx = margin;
+        colDefs.forEach(c => { pdf.text(c.label, hx + 2, y + 6); hx += c.w; });
+        y += headerH;
+      }
+      pdf.setFillColor(...(ri % 2 === 0 ? panelBg : [10, 28, 60]));
+      pdf.rect(margin, y, totalW, rowH, "F");
+      setFont(7, "normal", white);
+      let rx = margin;
+      colDefs.forEach(c => {
+        const val = String(row[c.key] || "");
+        const clipped = pdf.splitTextToSize(val, c.w - 3)[0] || "";
+        pdf.text(clipped, rx + 2, y + 5);
+        rx += c.w;
+      });
+      y += rowH;
+    });
+
+    // --- Save ---
+    const ts = new Date().toISOString().slice(0, 10);
+    pdf.save(`NCR_Report_${ts}.pdf`);
+  } catch (err) {
+    alert("Xuất PDF thất bại: " + err.message);
+    console.error(err);
+  } finally {
+    btn.textContent = "⬇ Export PDF";
+    btn.disabled = false;
+  }
+}
