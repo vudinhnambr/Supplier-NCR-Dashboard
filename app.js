@@ -395,15 +395,15 @@ async function exportPDF() {
     // --- Charts (capture canvas) ---
     const chartIds = ["supplierChart", "yearChart", "monthChart", "partChart", "phenomenonChart", "statusChart"];
     const chartTitles = ["Supplier NCR Ranking", "NCR by Year", "NCR by Month", "Top Parts", "Phenomenon", "Replacement Status"];
-    const fullCharts = [0, 5]; // index của full-width charts
-    const chartH = 52, chartW2 = (W - margin * 2 - 4) / 2, chartWfull = W - margin * 2;
-    let cx = margin, cy = y;
+    const chartH = 54;
+    const chartW2 = (W - margin * 2 - 5) / 2;
+    let col = 0, cy = y;
 
     for (let i = 0; i < chartIds.length; i++) {
       const canvas = document.getElementById(chartIds[i]);
       if (!canvas) continue;
-      const isFull = fullCharts.includes(i);
-      const cw = isFull ? chartWfull : chartW2;
+      const cx = margin + col * (chartW2 + 5);
+      const cw = chartW2;
 
       // Panel bg
       pdf.setFillColor(...panelBg); pdf.setDrawColor(36, 70, 120);
@@ -417,19 +417,16 @@ async function exportPDF() {
       const imgData = canvas.toDataURL("image/png");
       pdf.addImage(imgData, "PNG", cx + 2, cy + 8, cw - 4, chartH - 2);
 
-      if (isFull) {
-        cx = margin; cy += chartH + 12;
-      } else if (i % 2 === 0 && !fullCharts.includes(i)) {
-        cx = margin + chartW2 + 4;
-      } else {
-        cx = margin; cy += chartH + 12;
-      }
-
-      // New page if needed
-      if (cy + chartH + 12 > H - 10 && i < chartIds.length - 1) {
-        pdf.addPage();
-        pdf.setFillColor(...dark); pdf.rect(0, 0, W, H, "F");
-        cy = margin; cx = margin;
+      col++;
+      if (col >= 2) {
+        col = 0;
+        cy += chartH + 12;
+        // New page if needed
+        if (cy + chartH + 12 > H - 6 && i < chartIds.length - 1) {
+          pdf.addPage();
+          pdf.setFillColor(...dark); pdf.rect(0, 0, W, H, "F");
+          cy = margin;
+        }
       }
     }
 
