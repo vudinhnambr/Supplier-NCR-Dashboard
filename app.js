@@ -433,68 +433,6 @@ async function exportPDF() {
       }
     }
 
-    // --- Data Table (new page) ---
-    pdf.addPage();
-    pdf.setFillColor(...dark); pdf.rect(0, 0, W, H, "F");
-    y = margin;
-
-    setFont(12, "bold", blue);
-    pdf.text("NCR Detail List", margin, y + 6);
-    setFont(8, "normal", muted);
-    pdf.text(`Total: ${data.length} records`, margin, y + 12);
-    y += 18;
-
-    const colDefs = [
-      { key: columns.ncrNo,      label: "NCR No.",    w: 38 },
-      { key: columns.supplier,   label: "Supplier",   w: 28 },
-      { key: columns.part,       label: "Part",       w: 36 },
-      { key: columns.year,       label: "Year",       w: 14 },
-      { key: columns.month,      label: "Month",      w: 14 },
-      { key: columns.quantity,   label: "Qty",        w: 12 },
-      { key: columns.phenomenon, label: "Phenomenon", w: 44 },
-      { key: columns.replacement,label: "Status",     w: 38 },
-      { key: columns.closeDate,  label: "Close Date", w: 30 },
-    ];
-    const rowH = 7, headerH = 9;
-    const totalW = colDefs.reduce((s, c) => s + c.w, 0);
-
-    // Table header
-    pdf.setFillColor(37, 115, 255); pdf.setDrawColor(...panelBg);
-    pdf.rect(margin, y, totalW, headerH, "F");
-    setFont(7.5, "bold", white);
-    let tx = margin;
-    colDefs.forEach(c => {
-      pdf.text(c.label, tx + 2, y + 6); tx += c.w;
-    });
-    y += headerH;
-
-    // Rows
-    data.forEach((row, ri) => {
-      if (y + rowH > H - 8) {
-        pdf.addPage();
-        pdf.setFillColor(...dark); pdf.rect(0, 0, W, H, "F");
-        y = margin;
-        // Repeat header
-        pdf.setFillColor(37, 115, 255);
-        pdf.rect(margin, y, totalW, headerH, "F");
-        setFont(7.5, "bold", white);
-        let hx = margin;
-        colDefs.forEach(c => { pdf.text(c.label, hx + 2, y + 6); hx += c.w; });
-        y += headerH;
-      }
-      pdf.setFillColor(...(ri % 2 === 0 ? panelBg : [10, 28, 60]));
-      pdf.rect(margin, y, totalW, rowH, "F");
-      setFont(7, "normal", white);
-      let rx = margin;
-      colDefs.forEach(c => {
-        const val = String(row[c.key] || "");
-        const clipped = pdf.splitTextToSize(val, c.w - 3)[0] || "";
-        pdf.text(clipped, rx + 2, y + 5);
-        rx += c.w;
-      });
-      y += rowH;
-    });
-
     // --- Save ---
     const ts = new Date().toISOString().slice(0, 10);
     pdf.save(`NCR_Report_${ts}.pdf`);
