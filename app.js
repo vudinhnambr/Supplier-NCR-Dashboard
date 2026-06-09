@@ -254,6 +254,7 @@ function createBarChart(id, entries, title, horizontal = false, onSelect = null)
           border: { color: "rgba(255,255,255,.08)" }
         },
         y: {
+          grace: "15%",
           ticks: { color: "#6b8ab5", font: { size: 11 } },
           grid: { color: "rgba(255,255,255,.04)" },
           border: { color: "rgba(255,255,255,.08)" }
