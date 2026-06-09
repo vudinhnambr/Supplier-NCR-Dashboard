@@ -420,11 +420,11 @@ async function exportPDF() {
 
     // ── KPI Cards ──
     const kpis = [
-      { label: "Total NCR",  val: document.getElementById("totalNcr").textContent,      icon: "📋", sub: "Reports" },
-      { label: "Total Qty",  val: document.getElementById("totalQty").textContent,       icon: "📦", sub: "Defect units" },
-      { label: "Suppliers",  val: document.getElementById("totalSupplier").textContent,  icon: "🏭", sub: "Active" },
-      { label: "Parts",      val: document.getElementById("totalPart").textContent,       icon: "⚙️",  sub: "Affected" },
-      { label: "Open NCR",   val: document.getElementById("openNcr").textContent,        icon: "⚠️",  sub: "Pending" },
+      { label: "Total NCR",  val: document.getElementById("totalNcr").textContent,      symbol: "NCR", sub: "Reports" },
+      { label: "Total Qty",  val: document.getElementById("totalQty").textContent,       symbol: "QTY", sub: "Defect units" },
+      { label: "Suppliers",  val: document.getElementById("totalSupplier").textContent,  symbol: "SUP", sub: "Active" },
+      { label: "Parts",      val: document.getElementById("totalPart").textContent,       symbol: "PRT", sub: "Affected" },
+      { label: "Open NCR",   val: document.getElementById("openNcr").textContent,        symbol: "OPN", sub: "Pending" },
     ];
     const cardW = (W - margin * 2 - 4 * 3) / 5;
     kpis.forEach((k, i) => {
@@ -439,10 +439,11 @@ async function exportPDF() {
       pdf.setFillColor(...acc);
       pdf.roundedRect(x, y, cardW, 1.5, 1, 1, "F");
 
-      // Icon circle
-      pdf.setFillColor(acc[0]*0.2+3, acc[1]*0.2+10, acc[2]*0.2+28);
-      pdf.circle(x + cardW - 9, y + 8, 5, "F");
-      sf(9, "normal", acc); pdf.text(k.icon, x + cardW - 12, y + 10.5);
+      // Icon badge (circle + 3-letter code)
+      pdf.setFillColor(Math.min(acc[0]*0.25+5,60), Math.min(acc[1]*0.25+12,50), Math.min(acc[2]*0.25+35,80));
+      pdf.circle(x + cardW - 10, y + 9, 6, "F");
+      sf(5.5, "bold", acc);
+      pdf.text(k.symbol, x + cardW - 13, y + 10.5);
 
       // Label
       sf(7, "normal", muted); pdf.text(k.label.toUpperCase(), x + 4, y + 7);
@@ -456,7 +457,7 @@ async function exportPDF() {
     // ── Charts ──
     const chartIds    = ["supplierChart","yearChart","monthChart","partChart","phenomenonChart","statusChart"];
     const chartTitles = ["Supplier NCR Ranking","NCR by Year","NCR by Month","Top Parts","Phenomenon","Replacement Status"];
-    const chartIcons  = ["🏆","📅","🗓","⚙️","🔍","🔄"];
+    const chartSymbols = ["SUP","YR","MON","PRT","PHE","STS"];
     const chartH = 52, gap = 5;
     const chartW2 = (W - margin * 2 - gap) / 2;
     let col = 0, cy = y;
@@ -479,9 +480,11 @@ async function exportPDF() {
       pdf.setFillColor(darkMid[0], darkMid[1], darkMid[2]);
       pdf.rect(cx + 2, cy, chartW2 - 2, 9, "F");
 
-      // Icon + Title
-      sf(7.5, "normal", acc);  pdf.text(chartIcons[i], cx + 4, cy + 6.5);
-      sf(7.5, "bold",   white); pdf.text(chartTitles[i], cx + 11, cy + 6.5);
+      // Icon badge + Title
+      pdf.setFillColor(Math.min(acc[0]*0.2+5,50), Math.min(acc[1]*0.2+10,45), Math.min(acc[2]*0.2+30,70));
+      pdf.roundedRect(cx + 4, cy + 2, 10, 5, 1, 1, "F");
+      sf(4.5, "bold", acc); pdf.text(chartSymbols[i], cx + 5, cy + 5.8);
+      sf(7.5, "bold", white); pdf.text(chartTitles[i], cx + 16, cy + 6.5);
 
       // Subtle divider under title
       hline(cy + 9, cx + 2, cx + chartW2, lineCol, 0.2);
