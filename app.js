@@ -50,6 +50,12 @@ function showDashboard() {
   document.getElementById("loginGate").style.display = "none";
   document.getElementById("mainDashboard").style.display = "flex";
   loadData();
+  // Live clock
+  function tick() {
+    const el = document.getElementById("headerTime");
+    if (el) el.innerHTML = new Date().toLocaleString("vi-VN", { weekday:"short", year:"numeric", month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" });
+  }
+  tick(); setInterval(tick, 1000);
 }
 
 async function loadData() {
@@ -345,94 +351,175 @@ async function exportPDF() {
     const W = 297, H = 210, margin = 10;
     let y = margin;
 
-    // --- Helpers ---
-    const blue = [78, 161, 255];
-    const dark = [2, 11, 36];
-    const muted = [159, 181, 221];
-    const white = [255, 255, 255];
-    const panelBg = [7, 22, 48];
+    // ── Palette ──
+    const dark     = [3, 10, 28];
+    const darkMid  = [6, 18, 44];
+    const panel    = [9, 24, 58];
+    const panelAlt = [12, 30, 68];
+    const lineCol  = [30, 60, 110];
+    const white    = [235, 242, 255];
+    const muted    = [110, 145, 200];
+    const blue     = [77, 159, 255];
+    const cyan     = [0, 200, 255];
+    const green    = [0, 220, 150];
+    const orange   = [255, 140, 50];
+    const red      = [255, 80, 90];
+    const purple   = [160, 100, 255];
 
-    function setFont(size, style = "normal", color = white) {
+    const kpiAccents = [blue, cyan, green, purple, orange];
+    const chartAccents = [blue, cyan, green, purple, orange, red];
+
+    function sf(size, style = "normal", color = white) {
       pdf.setFontSize(size); pdf.setFont("helvetica", style); pdf.setTextColor(...color);
     }
+    function hline(yy, x1 = 0, x2 = W, color = lineCol, lw = 0.2) {
+      pdf.setDrawColor(...color); pdf.setLineWidth(lw); pdf.line(x1, yy, x2, yy);
+    }
 
-    // --- Background ---
+    // ── Full background ──
     pdf.setFillColor(...dark);
     pdf.rect(0, 0, W, H, "F");
 
-    // --- Header ---
-    setFont(22, "bold", blue);
-    pdf.text("NCR", margin, y + 8);
-    setFont(13, "bold", white);
-    pdf.text("SUPPLIER PERFORMANCE — NCR Analytics Report", margin + 20, y + 8);
-    setFont(9, "normal", muted);
-    const filterLabel = [
-      selectedSupplier ? `Supplier: ${selectedSupplier}` : "Supplier: All",
-      selectedYear ? `Year: ${selectedYear}` : "Year: All",
-      selectedMonth ? `Month: ${selectedMonth}` : ""
-    ].filter(Boolean).join("  |  ");
-    pdf.text(`${filterLabel}   |   Exported: ${new Date().toLocaleString()}`, margin, y + 15);
-    y += 22;
-
-    // --- KPI Cards ---
-    const kpis = [
-      { label: "Total NCR", val: document.getElementById("totalNcr").textContent },
-      { label: "Total Qty", val: document.getElementById("totalQty").textContent },
-      { label: "Suppliers", val: document.getElementById("totalSupplier").textContent },
-      { label: "Parts", val: document.getElementById("totalPart").textContent },
-      { label: "Open NCR", val: document.getElementById("openNcr").textContent },
-    ];
-    const cardW = (W - margin * 2 - 8) / 5;
-    kpis.forEach((k, i) => {
-      const x = margin + i * (cardW + 2);
-      pdf.setFillColor(...panelBg); pdf.setDrawColor(36, 70, 120);
-      pdf.roundedRect(x, y, cardW, 20, 2, 2, "FD");
-      setFont(8, "normal", muted); pdf.text(k.label, x + 4, y + 7);
-      setFont(14, "bold", white); pdf.text(k.val, x + 4, y + 17);
+    // ── Top accent bar ──
+    const grad = [[77,159,255],[0,200,255],[0,220,150]];
+    const segW = W / grad.length;
+    grad.forEach((c, i) => {
+      pdf.setFillColor(...c);
+      pdf.rect(i * segW, 0, segW + 1, 1.5, "F");
     });
-    y += 26;
 
-    // --- Charts (capture canvas) ---
-    const chartIds = ["supplierChart", "yearChart", "monthChart", "partChart", "phenomenonChart", "statusChart"];
-    const chartTitles = ["Supplier NCR Ranking", "NCR by Year", "NCR by Month", "Top Parts", "Phenomenon", "Replacement Status"];
-    const chartH = 54;
-    const chartW2 = (W - margin * 2 - 5) / 2;
+    // ── Header block ──
+    pdf.setFillColor(...darkMid);
+    pdf.rect(0, 1.5, W, 20, "F");
+
+    // Logo box
+    pdf.setFillColor(...blue);
+    pdf.roundedRect(margin, 4, 16, 12, 2, 2, "F");
+    sf(9, "bold", dark); pdf.text("NCR", margin + 2.5, 12);
+
+    // Title
+    sf(14, "bold", white); pdf.text("SUPPLIER PERFORMANCE", margin + 20, 10);
+    sf(8, "normal", [100, 160, 230]); pdf.text("NCR Analytics Report", margin + 20, 16);
+
+    // Right side: filter info box
+    const filterLabel = [
+      selectedSupplier ? `Supplier: ${selectedSupplier}` : "All Suppliers",
+      selectedYear ? `Year: ${selectedYear}` : "All Years",
+      selectedMonth ? `Month: ${selectedMonth}` : ""
+    ].filter(Boolean).join("  ·  ");
+    const dateStr = new Date().toLocaleString("vi-VN");
+
+    pdf.setFillColor(...panel);
+    pdf.roundedRect(W - 110, 4, 100, 13, 2, 2, "F");
+    sf(7, "normal", muted); pdf.text("FILTER", W - 107, 9);
+    sf(7, "bold", [160, 200, 255]); pdf.text(filterLabel, W - 107, 13.5);
+    sf(6.5, "normal", muted); pdf.text(`Exported: ${dateStr}`, W - 107, 17.5);
+
+    hline(21.5, 0, W, lineCol, 0.3);
+    y = 26;
+
+    // ── KPI Cards ──
+    const kpis = [
+      { label: "Total NCR",  val: document.getElementById("totalNcr").textContent,      icon: "📋", sub: "Reports" },
+      { label: "Total Qty",  val: document.getElementById("totalQty").textContent,       icon: "📦", sub: "Defect units" },
+      { label: "Suppliers",  val: document.getElementById("totalSupplier").textContent,  icon: "🏭", sub: "Active" },
+      { label: "Parts",      val: document.getElementById("totalPart").textContent,       icon: "⚙️",  sub: "Affected" },
+      { label: "Open NCR",   val: document.getElementById("openNcr").textContent,        icon: "⚠️",  sub: "Pending" },
+    ];
+    const cardW = (W - margin * 2 - 4 * 3) / 5;
+    kpis.forEach((k, i) => {
+      const x = margin + i * (cardW + 3);
+      const acc = kpiAccents[i];
+
+      // Card bg + border
+      pdf.setFillColor(...panel); pdf.setDrawColor(...lineCol);
+      pdf.roundedRect(x, y, cardW, 24, 2, 2, "FD");
+
+      // Top accent line
+      pdf.setFillColor(...acc);
+      pdf.roundedRect(x, y, cardW, 1.5, 1, 1, "F");
+
+      // Icon circle
+      pdf.setFillColor(acc[0]*0.2+3, acc[1]*0.2+10, acc[2]*0.2+28);
+      pdf.circle(x + cardW - 9, y + 8, 5, "F");
+      sf(9, "normal", acc); pdf.text(k.icon, x + cardW - 12, y + 10.5);
+
+      // Label
+      sf(7, "normal", muted); pdf.text(k.label.toUpperCase(), x + 4, y + 7);
+      // Value
+      sf(16, "bold", white); pdf.text(k.val, x + 4, y + 18);
+      // Sub label
+      sf(6.5, "normal", acc); pdf.text(k.sub, x + 4, y + 22.5);
+    });
+    y += 30;
+
+    // ── Charts ──
+    const chartIds    = ["supplierChart","yearChart","monthChart","partChart","phenomenonChart","statusChart"];
+    const chartTitles = ["Supplier NCR Ranking","NCR by Year","NCR by Month","Top Parts","Phenomenon","Replacement Status"];
+    const chartIcons  = ["🏆","📅","🗓","⚙️","🔍","🔄"];
+    const chartH = 52, gap = 5;
+    const chartW2 = (W - margin * 2 - gap) / 2;
     let col = 0, cy = y;
 
     for (let i = 0; i < chartIds.length; i++) {
       const canvas = document.getElementById(chartIds[i]);
       if (!canvas) continue;
-      const cx = margin + col * (chartW2 + 5);
-      const cw = chartW2;
+      const cx = margin + col * (chartW2 + gap);
+      const acc = chartAccents[i];
 
-      // Panel bg
-      pdf.setFillColor(...panelBg); pdf.setDrawColor(36, 70, 120);
-      pdf.roundedRect(cx, cy, cw, chartH + 8, 2, 2, "FD");
+      // Card bg
+      pdf.setFillColor(...panel); pdf.setDrawColor(...lineCol);
+      pdf.roundedRect(cx, cy, chartW2, chartH + 10, 2, 2, "FD");
 
-      // Title
-      setFont(8, "bold", blue);
-      pdf.text(chartTitles[i], cx + 4, cy + 6);
+      // Left accent bar
+      pdf.setFillColor(...acc);
+      pdf.roundedRect(cx, cy, 2, chartH + 10, 1, 1, "F");
+
+      // Title row bg
+      pdf.setFillColor(darkMid[0], darkMid[1], darkMid[2]);
+      pdf.rect(cx + 2, cy, chartW2 - 2, 9, "F");
+
+      // Icon + Title
+      sf(7.5, "normal", acc);  pdf.text(chartIcons[i], cx + 4, cy + 6.5);
+      sf(7.5, "bold",   white); pdf.text(chartTitles[i], cx + 11, cy + 6.5);
+
+      // Subtle divider under title
+      hline(cy + 9, cx + 2, cx + chartW2, lineCol, 0.2);
 
       // Chart image
       const imgData = canvas.toDataURL("image/png");
-      pdf.addImage(imgData, "PNG", cx + 2, cy + 8, cw - 4, chartH - 2);
+      pdf.addImage(imgData, "PNG", cx + 3, cy + 10, chartW2 - 5, chartH - 1);
 
       col++;
       if (col >= 2) {
         col = 0;
-        cy += chartH + 12;
-        // New page if needed
-        if (cy + chartH + 12 > H - 6 && i < chartIds.length - 1) {
+        cy += chartH + 14;
+        if (cy + chartH + 14 > H - 6 && i < chartIds.length - 1) {
           pdf.addPage();
           pdf.setFillColor(...dark); pdf.rect(0, 0, W, H, "F");
-          cy = margin;
+          pdf.setFillColor(...darkMid); pdf.rect(0, 0, W, 6, "F");
+          grad.forEach((c, gi) => { pdf.setFillColor(...c); pdf.rect(gi * segW, 0, segW + 1, 1.5, "F"); });
+          cy = 10;
         }
       }
     }
 
-    // --- Save ---
+    // ── Footer ──
+    const lastPage = pdf.getNumberOfPages();
+    for (let p = 1; p <= lastPage; p++) {
+      pdf.setPage(p);
+      hline(H - 8, 0, W, lineCol, 0.3);
+      pdf.setFillColor(...darkMid); pdf.rect(0, H - 8, W, 8, "F");
+      sf(6.5, "normal", muted);
+      pdf.text("CSBearing · Supplier NCR Dashboard", margin, H - 3);
+      pdf.text(`Page ${p} / ${lastPage}`, W / 2, H - 3, { align: "center" });
+      pdf.text(dateStr, W - margin, H - 3, { align: "right" });
+    }
+
+    // ── Save ──
     const ts = new Date().toISOString().slice(0, 10);
     pdf.save(`NCR_Report_${ts}.pdf`);
+
   } catch (err) {
     alert("Xuất PDF thất bại: " + err.message);
     console.error(err);
