@@ -7,8 +7,9 @@ let selectedPart = "", selectedPhenomenon = "", selectedStatus = "";
 const ACTIVE_SUPPLIERS = ["WUXI PAIKE", "SINHOM", "TAESANG"];
 const MASTER_PASSWORD = "CSBearing";
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const chartColor = "#2589ff";
-const chartBorder = "#6fb7ff";
+const chartColor = "rgba(77,159,255,0.75)";
+const chartBorder = "#4d9fff";
+const chartColorHover = "rgba(77,159,255,0.95)";
 
 const columnAliases = {
   ncrNo: ["NCR No.", "NCR No", "NCR Number"],
@@ -216,15 +217,41 @@ function createBarChart(id, entries, title, horizontal = false, onSelect = null)
     type: "bar",
     data: {
       labels: entries.map(e => e.label),
-      datasets: [{ label: title, data: entries.map(e => e.value), backgroundColor: chartColor, borderColor: chartBorder, borderWidth: 1, borderRadius: 2 }]
+      datasets: [{
+        label: title,
+        data: entries.map(e => e.value),
+        backgroundColor: entries.map(() => "rgba(77,159,255,0.65)"),
+        borderColor: entries.map(() => "#4d9fff"),
+        borderWidth: 1,
+        borderRadius: 4,
+        borderSkipped: false,
+        maxBarThickness: 52,
+        hoverBackgroundColor: "rgba(77,159,255,0.95)",
+      }]
     },
     options: {
-      responsive: true, maintainAspectRatio: false, indexAxis: horizontal ? "y" : "x",
+      responsive: true, maintainAspectRatio: false,
+      indexAxis: horizontal ? "y" : "x",
       onClick: (e, els) => onSelect?.(els),
-      plugins: { legend: { display: false } },
-      scales: { 
-          x: { ticks: { color: "#d7e5ff" }, grid: { color: "rgba(255,255,255,.05)" } },
-          y: { ticks: { color: "#d7e5ff" }, grid: { color: "rgba(255,255,255,.08)" } } 
+      plugins: { legend: { display: false }, tooltip: {
+        backgroundColor: "#0c1f3d",
+        borderColor: "#2a4f8a",
+        borderWidth: 1,
+        titleColor: "#9fb5dd",
+        bodyColor: "#e8f0ff",
+        padding: 10,
+      }},
+      scales: {
+        x: {
+          ticks: { color: "#6b8ab5", font: { size: 11 } },
+          grid: { color: "rgba(255,255,255,.04)" },
+          border: { color: "rgba(255,255,255,.08)" }
+        },
+        y: {
+          ticks: { color: "#6b8ab5", font: { size: 11 } },
+          grid: { color: "rgba(255,255,255,.04)" },
+          border: { color: "rgba(255,255,255,.08)" }
+        }
       }
     },
     plugins: [valueLabelPlugin]
@@ -237,10 +264,13 @@ const valueLabelPlugin = {
     const { ctx } = chart;
     chart.getDatasetMeta(0).data.forEach((bar, i) => {
       const v = chart.data.datasets[0].data[i];
-      if (v === undefined) return;
-      ctx.save(); ctx.fillStyle = "#d7e5ff"; ctx.font = "12px Arial";
-      ctx.textAlign = chart.options.indexAxis === 'y' ? 'left' : 'center';
-      ctx.fillText(v, chart.options.indexAxis === 'y' ? bar.x + 5 : bar.x, chart.options.indexAxis === 'y' ? bar.y : bar.y - 10);
+      if (!v) return;
+      const isH = chart.options.indexAxis === 'y';
+      ctx.save();
+      ctx.fillStyle = "#9fb5dd";
+      ctx.font = "600 11px Inter, sans-serif";
+      ctx.textAlign = isH ? 'left' : 'center';
+      ctx.fillText(v, isH ? bar.x + 6 : bar.x, isH ? bar.y + 4 : bar.y - 8);
       ctx.restore();
     });
   }
